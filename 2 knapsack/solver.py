@@ -23,9 +23,11 @@ def solve_it(input_data):
     weights = data[:, 1]
 
     # Optimisation
-    if n > 400:
-        print("### Greedy Algo ###")
-        selection, weight, count, spare = greedy_dens(values, weights, cap)
+    if n > 1000:
+        # print("### Greedy Algo ###")
+        # selection, weight, count, spare = greedy_dens(values, weights, cap)
+        print("### Filtering ###")
+        selection, weight, count, spare = filtering(values, weights, cap)
         for i in tqdm(range(N_TRIALS)):
             selection, weight, count, spare = local_search(
                 values, weights, cap, selection
@@ -42,6 +44,36 @@ def solve_it(input_data):
     output_data = str(value.astype(int)) + " " + str(0) + "\n"
     output_data += " ".join(map(str, selection.astype(int)))
     return output_data
+
+
+def filtering(values, weights, cap, rho_min=None):
+    n = len(values)
+    rho = values / weights
+    if rho_min is None:
+        rho_min = np.quantile(rho, 1 - 500 / n)
+    idi = np.arange(n)
+    idf = idi[rho > rho_min]
+    print("Number of Filtered items:", len(idf))
+
+    output = DynPjit(values[idf], weights[idf], cap)
+    sol = output[0]
+    idx = idf[sol == 1]
+    solution = np.zeros(n)
+    solution[idx] = 1
+    print(solution.dot(values))
+    idx = np.argsort(rho)
+    for i in reversed(idx):
+        if solution[i]:
+            continue
+        solution[i] = 1
+        if solution.dot(weights) > cap:
+            solution[i] = 0
+    return (
+        solution,
+        solution.dot(weights),
+        solution.sum(),
+        cap - solution.dot(weights),
+    )
 
 
 def greedy_dens(values, weights, capacity):
