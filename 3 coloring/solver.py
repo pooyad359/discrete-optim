@@ -7,6 +7,7 @@ import numpy as np
 from tqdm.auto import tqdm, trange
 from copy import deepcopy
 from collections import namedtuple, Counter
+from pdb import set_trace
 
 N_POP = 100
 N_ROUNDS = 1000
@@ -38,7 +39,7 @@ def solve_it(input_data):
     # solution = range(0, node_count)
 
     # res = fixed_color(edges,node_count,n_colors)
-    MODE = 3
+    MODE = 4
     if MODE == 0:
         print("<<< USING STEP-WISE CP >>>")
         n_colors, res = stepwise_opt(edges, node_count)
@@ -61,11 +62,27 @@ def solve_it(input_data):
         print("<<< USING GREEDY + REORDERING >>>")
         res = reordered_greedy(edges, node_count, 1, 5000)
         n_colors = count_colors(res)
+
+    elif MODE == 4:
+        print("<<< DOUBLE TRIAL >>>")
+        res1 = reordered_greedy(edges, node_count, 1, 5000)
+        n_colors_1 = count_colors(res1)
+        n_colors_2, res2 = stepwise_opt(edges, node_count, n_colors_1)
+        if res2 is None:
+            res = res1
+            n_colors = n_colors_1
+        elif n_colors_1 < n_colors_2:
+            res = res1
+            n_colors = n_colors_1
+        else:
+            res = res2
+            n_colors = n_colors_2
     else:
         print("<<< USING GREEDY >>>")
         res = greedy_solver(edges, node_count)
         n_colors = np.max(res) + 1
     # res = all_res[-1]
+    # set_trace()
     print("\n\n---- Solution ----")
     print("Number of colors:", n_colors)
     print(*sorted(Counter(res).items()), sep="\n")
@@ -178,11 +195,14 @@ def fixed_color(edges, n_points, n_colors):
         return []
 
 
-def stepwise_opt(edges, node_count):
+def stepwise_opt(edges, node_count, n_colors=None):
     print("\n\n*** Initiating Step-wise optimisation ***")
-    print(f"\nFinding Solution for {node_count} Nodes", flush=True)
-    n_colors, colors = color_graph(edges, node_count)
-    print(f"Found solution for {n_colors} colors", flush=True)
+    if n_colors is None:
+        print(f"\nFinding Solution for {node_count} Nodes", flush=True)
+        n_colors, colors = color_graph(edges, node_count)
+        print(f"Found solution for {n_colors} colors", flush=True)
+    else:
+        colors = None
     while n_colors is not None:
         print(f"\tTrying {n_colors-1} colors", flush=True)
         n_colors_prev, colors_prev = n_colors, colors
