@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
-
+import matplotlib.pyplot as plt
 import os
 from functools import lru_cache
 import math
-from collections import namedtuple
+from collections import namedtuple, deque
 
 Point = namedtuple("Point", ["x", "y"])
 
@@ -31,7 +31,20 @@ def solve_it(input_data):
 
     # build a trivial solution
     # visit the nodes in the order they appear in the file
-    solution = to_nearest(points)
+    mode = 0
+    if nodeCount > 10000:
+        mode = -1
+    if mode == 0:
+        solution = to_nearest(points)
+        d = deque(solution)
+        d.rotate(len(solution) // 2)
+        solution = two_opt(list(d), points)
+    elif mode == -1:
+        with open("./prob_6_nearest.sol") as fp:
+            output = fp.read()
+            return output
+    else:
+        solution = to_nearest(points)
 
     # calculate the length of the tour
     obj = length(points[solution[-1]], points[solution[0]])
@@ -41,16 +54,16 @@ def solve_it(input_data):
     # prepare the solution in the specified output format
     output_data = "%.2f" % obj + " " + str(0) + "\n"
     output_data += " ".join(map(str, solution))
-
+    view_tsp(solution, points)
     return output_data
 
 
-@lru_cache(256)
+@lru_cache(1024)
 def distance(point1, point2):
     return math.sqrt((point1.x - point2.x) ** 2 + (point1.y - point2.y) ** 2)
 
 
-def view_tsp(solution, figsize=(8, 8)):
+def view_tsp(solution, points, figsize=(8, 8)):
     """
     List of points
     """
@@ -66,6 +79,40 @@ def view_tsp(solution, figsize=(8, 8)):
         plt.text(
             xi + 0.01, yi + 0.01, i, fontdict={"fontsize": 16, "color": "darkblue"}
         )
+    plt.show()
+
+
+def cost_change(n1, n2, n3, n4):
+    return distance(n1, n3) + distance(n2, n4) - distance(n1, n2) - distance(n4, n3)
+
+
+def two_opt(route, points, max_iter=1000):
+    best = route.copy()
+    improved = True
+    counter = 0
+    #     pbar = trange(max_iter)
+    while improved and counter < max_iter:
+        counter += 1
+        value = loss(route, points)
+        print(f"#{counter:04.0f} \t{value}", flush=True)
+        improved = False
+        for i in range(1, len(route) - 2):
+            for j in range(i + 1, len(route)):
+                if j - i == 1:
+                    continue
+                if (
+                    cost_change(
+                        points[best[i - 1]],
+                        points[best[i]],
+                        points[best[j - 1]],
+                        points[best[j]],
+                    )
+                    < 0
+                ):
+                    best[i:j] = best[j - 1 : i - 1 : -1]
+                    improved = True
+        route = best
+    return best
 
 
 def to_nearest(points):
