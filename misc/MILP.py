@@ -173,10 +173,27 @@ print(highest_order, orders[highest_order])
 
 max_color = highest_order + 1
 
+# +
+import networkx as nx
+import matplotlib.pyplot as plt
+
+
+def create_graph(n_points, edges):
+    graph = nx.Graph()
+    graph.add_nodes_from(range(n_points))
+    graph.add_edges_from(edges)
+    return graph
+
+
+def get_max_clique(n_points, edges):
+    graph = create_graph(n_points, edges)
+    cliques = nx.find_cliques(graph)
+    return max([len(c) for c in cliques])
+
 
 def gc_mip(n_points, edges, max_color):
     n_colors = max_color
-
+    min_colors = get_max_clique(n_points, edges)
     # Create solver
     solver = pywraplp.Solver.CreateSolver("SCIP", "SCIP")
 
@@ -196,8 +213,18 @@ def gc_mip(n_points, edges, max_color):
         solver.Add(sum(colors[i]) <= 1)
         solver.Add(sum(colors[i]) >= 1)
 
-    #     total_weight = sum([weights[i] * choices[i] for i in range(n)])
-    #     solver.Add(total_weight <= capacity)
+        #     total_weight = sum([weights[i] * choices[i] for i in range(n)])
+        #     solver.Add(total_weight <= capacity)
+
+        # Break Symmetry
+#         for c in range(n_colors - 1):
+#             sum1 = sum([colors[i][c] for i in range(n_points)])
+#             sum2 = sum([colors[i][c + 1] for i in range(n_points)])
+#             solver.Add(sum1 >= sum2)
+
+#             # Min colors
+#             if c < min_colors:
+#                 solver.Add(sum1 >= 1)
 
     # Objective
     obj = 0
@@ -232,8 +259,12 @@ def gc_mip(n_points, edges, max_color):
     print("Problem solved in %d branch-and-bound nodes" % solver.nodes())
 
 
-gc_mip(node_count, edges, max_color)
+# -
 
-solver = pywraplp.Solver.CreateSolver("SCIP", "SCIP")
+gc_mip(node_count, edges, max_color//2)
 
-solver.Minimize
+# +
+# gc_mip(node_count, edges, max_color // 2)
+# -
+
+
