@@ -144,7 +144,7 @@ path = "../3 coloring/data"
 files = os.listdir(path)
 [f"{i}. {f}" for i, f in enumerate(files)]
 
-idx = 10
+idx = 26
 print(files[idx])
 with open(os.path.join(path, files[idx]), "r") as fp:
     input_data = fp.read()
@@ -171,8 +171,6 @@ orders = [np.sum(edge_array == i) for i in range(node_count)]
 highest_order = int(np.argmax(orders))
 print(highest_order, orders[highest_order])
 
-max_color = highest_order + 1
-
 # +
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -189,6 +187,12 @@ def get_max_clique(n_points, edges):
     graph = create_graph(n_points, edges)
     cliques = nx.find_cliques(graph)
     return max([len(c) for c in cliques])
+
+
+def get_cliques(n_points, edges):
+    graph = create_graph(n_points, edges)
+    cliques = nx.find_cliques(graph)
+    return [c for c in cliques if len(c) > 2]
 
 
 def gc_mip(n_points, edges, max_color):
@@ -217,15 +221,20 @@ def gc_mip(n_points, edges, max_color):
         #     solver.Add(total_weight <= capacity)
 
         # Break Symmetry
-#         for c in range(n_colors - 1):
-#             sum1 = sum([colors[i][c] for i in range(n_points)])
-#             sum2 = sum([colors[i][c + 1] for i in range(n_points)])
-#             solver.Add(sum1 >= sum2)
+    #         for c in range(n_colors - 1):
+    #             sum1 = sum([colors[i][c] for i in range(n_points)])
+    #             sum2 = sum([colors[i][c + 1] for i in range(n_points)])
+    #             solver.Add(sum1 >= sum2)
 
-#             # Min colors
-#             if c < min_colors:
-#                 solver.Add(sum1 >= 1)
+    #             # Min colors
+    #             if c < min_colors:
+    #                 solver.Add(sum1 >= 1)
 
+    # Use cliques as constraint
+    cliques = get_cliques(n_points, edges)
+    for clq in cliques:
+        for c in range(n_colors):
+            solver.Add(sum([colors[i][c] for i in clq]) <= 1)
     # Objective
     obj = 0
     for i in range(n_points):
@@ -261,10 +270,45 @@ def gc_mip(n_points, edges, max_color):
 
 # -
 
-gc_mip(node_count, edges, max_color//2)
+sol = greedy_solver(edges, node_count)
+max_color = len(set(sol))
+max_color
+
+gc_mip(node_count, edges, max_color)
+
+from graph_coloring import greedy_solver, cp_solver_test
+
+greedy_solver(edges, node_count)
+
+cp_solver_test(edges,node_count)
+
+# # Travelling Salesman
+
+from collections import namedtuple
+
+Point = namedtuple("Point", ["x", "y"])
+
+path = "../4 tsp/data"
+files = os.listdir(path)
+[f"{i}. {f}" for i, f in enumerate(files)]
+
+idx = 67
+print(files[idx])
+with open(os.path.join(path, files[idx]), "r") as fp:
+    input_data = fp.read()
+print(input_data[:35])
 
 # +
-# gc_mip(node_count, edges, max_color // 2)
+lines = input_data.split("\n")
+
+nodeCount = int(lines[0])
+
+points = []
+for i in range(1, nodeCount + 1):
+    line = lines[i]
+    parts = line.split()
+    points.append(Point(float(parts[0]), float(parts[1])))
+
 # -
 
 
