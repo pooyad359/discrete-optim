@@ -11,6 +11,7 @@ from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
 import random
 import itertools
+from tqdm.auto import trange
 
 Point = namedtuple("Point", ["x", "y"])
 
@@ -93,6 +94,27 @@ def solve_it(input_data):
     output_data += " ".join(map(str, solution))
     view_tsp(solution, points)
     return output_data
+
+
+def load_data(filename, prefix="data"):
+    with open(os.path.join(prefix, filename)) as fp:
+        content = fp.read().split("\n")
+
+    node_count = int(content[0])
+    points = []
+    for i in range(1, node_count + 1):
+        line = content[i]
+        parts = line.split()
+        points.append(Point(float(parts[0]), float(parts[1])))
+
+    print(f"#Nodes: {node_count}")
+
+    d = []
+    for i in range(node_count):
+        row = [distance(points[i], points[j]) for j in range(node_count)]
+        d.append(row)
+
+    return node_count, points
 
 
 @lru_cache(1024)
@@ -261,6 +283,45 @@ def get_route(manager, routing, solution):
         new_index = solution.Value(routing.NextVar(index))
         route.append(new_index)
     route.pop(-1)
+    return route
+
+
+def dynamic_greedy(points, trials=1, shuffle=False, random_state=None):
+    assert isinstance(trials, int) and trials > 0, "Invalid number for trials."
+    random.seed(random_state)
+    if trials > 1:
+        routes = []
+        values = []
+        for i in trange(trials):
+            seed = random.randint(0, 10000)
+            route = dynamic_greedy(
+                points,
+                trials=1,
+                shuffle=True,
+                random_state=seed,
+            )
+            values.append(loss(route, points))
+            routes.append(route)
+        idx = np.argmin(values)
+        return routes[idx]
+
+    unused = points.copy()
+    if shuffle:
+        random.shuffle(unused)
+    sol = []
+    sol.append(unused.pop(0))
+    sol.append(unused.pop(0))
+    obj = loss(range(len(sol)), sol)
+    while len(unused) > 0:
+        point = unused.pop(0)
+        values = []
+        for i in range(len(sol)):
+            new_sol = sol.copy()
+            new_sol.insert(i, point)
+            values.append(loss(range(len(new_sol)), new_sol))
+        idx = np.argmin(values)
+        sol.insert(idx, point)
+    route = [points.index(p) for p in sol]
     return route
 
 

@@ -202,6 +202,8 @@ view_tsp(sol2)
 
 # # CP
 
+from solver import view_tsp
+
 with open(join('./data/','tsp_70_1')) as fp:
     content = fp.read().split('\n')
 
@@ -224,9 +226,9 @@ model = cp_model.CpModel()
 a = [] # whether i and j are connected
 u = [] # order of oints
 for i in range(node_count):
-    row = [model.NewIntVar(0,1,f'a_{i}_{j}') for j in range(node_count)]
+    row = [model.NewBoolVar(f'a_{i}_{j}') for j in range(node_count)]
     a.append(row)
-u = [model.NewIntVar(1,node_count-1,f'u_{i}') for i in range(node_count)]
+# u = [model.NewIntVar(1,node_count-1,f'u_{i}') for i in range(node_count)]
 
 # +
 # Add Constraints
@@ -237,11 +239,11 @@ for i in range(node_count):
     
 # model.AddAllDifferent(u)
 
-for i in range(node_count):
-    for j in range(node_count):
-        if i==j: continue
-        model.Add(u[i]-u[j]+node_count*a[i][j]<=node_count-1)
-model.Add(u[0]==0)
+# for i in range(1,node_count):
+#     for j in range(1,node_count):
+#         if i==j: continue
+#         model.Add(u[i]-u[j]+node_count*a[i][j]<=node_count-1)
+# model.Add(u[0]==0)
 # model.Add(u[-1]==node_count)
 # -
 
@@ -249,17 +251,56 @@ model.Add(u[0]==0)
 obj = []
 for i in range(node_count):
     for j in range(node_count):
-        d = distance(points[i],points[j])
+        d = distance(points[i],points[j])*100
         obj.append(int(d)*a[i][j])
 model.Minimize(sum(obj))
 
-solver = cp_model.CpSolver()
-solver.parameters.max_time_in_seconds = 10.0
-status = solver.Solve(model)
+cpsolver = cp_model.CpSolver()
+cpsolver.parameters.max_time_in_seconds = 60.0
+status = cpsolver.Solve(model)
 
-status == cp_model.OPTIMAL
+STATUS = {
+    cp_model.FEASIBLE: 'FEASIBLE',
+    cp_model.UNKNOWN: 'UNKNOWN',
+    cp_model.MODEL_INVALID: 'MODEL_INVALID',
+    cp_model.INFEASIBLE: 'INFEASIBLE',
+    cp_model.OPTIMAL: 'OPTIMAL',
+}
+STATUS[status]
 
-solver.Value(u)
+# +
+sol_mat = []
+for i in range(node_count):
+    row = [cpsolver.Value(a[i][j]) for j in range(node_count)]
+    sol_mat.append(row)
+    print(row)
+    
+sol_mat = np.array(sol_mat)
+
+# -
+
+np.argmax(sol_mat,axis=0)
+
+
+def view_matrix(mat,points,figsize = (8,8)):
+    lines = []
+#     row = np.argmax(sol_mat,axis=0)
+    row = np.arange(len(points))
+    col = np.argmax(sol_mat,axis=1)
+    plt.figure(figsize=figsize)
+    for i,j in zip(row,col):
+        x = [points[i].x,points[j].x]
+        y = [points[i].y,points[j].y]
+        plt.plot(x,y,'ok-')
+
+
+view_matrix(sol_mat,points)
+
+plt.figure(figsize=(6, 6))
+plt.scatter(
+    x=[p.x for p in points],
+    y=[p.y for p in points],
+)
 
 # # Randomized Opt-2
 
@@ -588,3 +629,70 @@ view_tsp(sol,points)
 sol2 = local_search(sol,points)
 
 view_tsp(sol2,points,(12,12))
+
+# # Dynamic Greedy
+
+import random
+from solver import load_data, two_opt_v2, local_search
+from tqdm.auto import trange
+
+
+# +
+def dynamic_greedy(points,trials = 1,shuffle=False, random_state=None):
+    assert isinstance(trials,int) and trials>0, 'Invalid number for trials.'
+    random.seed(random_state)
+    if trials>1:
+        routes = []
+        values = []
+        for i in trange(trials):
+            seed = random.randint(0,10000)
+            route = dynamic_greedy(
+                points,trials = 1,
+                shuffle=True, 
+                random_state=seed,
+            )
+            values.append(loss(route,points))
+            routes.append(route)
+        idx = np.argmin(values)
+        print(*enumerate(values),sep='\n')
+        return routes[idx]
+    
+    unused = points.copy()
+    random.shuffle(unused)
+    sol = []
+    sol.append(unused.pop(0))
+    sol.append(unused.pop(0))
+    obj = loss(range(len(sol)),sol)
+    while len(unused)>0:
+        point = unused.pop(0)
+        values = []
+        for i in range(len(sol)):
+            new_sol = sol.copy()
+            new_sol.insert(i,point)
+            values.append(loss(range(len(new_sol)),new_sol))
+        idx = np.argmin(values)
+        sol.insert(idx,point)
+    route = [points.index(p) for p in sol]
+    return route
+
+
+# -
+
+node_count,points = load_data('tsp_100_3')
+
+sol = dynamic_greedy(points,20)
+
+view_tsp(sol,points)
+
+sol2 = two_opt_v2(sol,points)
+view_tsp(sol2,points)
+
+sol3 = local_search(sol2,points)
+view_tsp(sol3,points)
+
+solrnd = randomized_opt2(points,200)
+
+view_tsp(solrnd,points)
+
+solrnd3 = local_search(solrnd,points)
+view_tsp(solrnd3,points)
