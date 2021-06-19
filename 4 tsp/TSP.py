@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ---
 # jupyter:
 #   jupytext:
@@ -12,6 +13,11 @@
 #     language: python
 #     name: python3
 # ---
+
+# # Setup
+
+# %load_ext autoreload
+# %autoreload 2
 
 # +
 import numpy as np
@@ -439,13 +445,146 @@ route=get_route(manager, routing, solution)
 
 route
 
-route[-1]=0
+# # MILP
+
+# ## Miller–Tucker–Zemlin formulation
+
+import os
+from ortools.linear_solver import pywraplp 
+
+print(*ls('./data'),sep='\t')
+
+with open('./data/tsp_51_1') as fp:
+    content = fp.read().split('\n')
 
 
-view_tsp(route,points)
+# +
+node_count = int(content[0])
+points = []
+for i in range(1, node_count + 1):
+    line = content[i]
+    parts = line.split()
+    points.append(Point(float(parts[0]), float(parts[1])))
 
-# %debug
+print(f'#Nodes: {node_count}')
 
-solution.ObjectiveValue()
+d = []
+for i in range(node_count):
+    row =[distance(points[i],points[j]) for j in range(node_count)]
+    d.append(row)
+    
+np.shape(d)
+# -
 
-solution
+plt.figure(figsize=(6, 6))
+plt.scatter(
+    x=[p.x for p in points],
+    y=[p.y for p in points],
+)
+
+solver = pywraplp.Solver.CreateSolver('TSP1','SCIP')
+
+# ### Variables
+
+# Edges
+x = [[solver.BoolVar(f'x_{i}_{j}') for j in range(node_count)]
+     for i in range(node_count)]
+
+# +
+# Order Visitied
+# u = [0]+[solver.IntVar(1,node_count-1,f'u_{i}') for i in range(1,node_count)]
+# -
+
+# ### Constraints
+
+# +
+for i in range(node_count):
+    # x_i_i == 0
+    solver.Add(x[i][i]==0)
+    
+    # Row sum == 1
+    solver.Add(sum([x[i][j] for j in range(node_count)])==1)
+    
+    # Column sum == 1
+    solver.Add(sum([x[j][i] for j in range(node_count)])==1)
+
+# for i in range(1,node_count):
+#     for j in range(1,node_count):
+#         if i==j: continue
+#         # No subtour
+#         solver.Add(u[i]-u[j]+node_count*x[i][j]<=node_count-1)
+    
+# -
+
+# ### Objective
+
+# +
+obj = 0
+for i in range(node_count):
+    for j in range(node_count):
+        obj += d[i][j]*x[i][j]
+
+solver.Minimize(obj)
+# -
+
+# ### Solve
+
+STATUS = {
+    pywraplp.Solver.FEASIBLE: 'FEASIBLE',
+    pywraplp.Solver.UNBOUNDED: 'UNBOUNDED',
+    pywraplp.Solver.BASIC: 'BASIC',
+    pywraplp.Solver.INFEASIBLE: 'INFEASIBLE',
+    pywraplp.Solver.NOT_SOLVED: 'NOT_SOLVED',
+    pywraplp.Solver.OPTIMAL: 'OPTIMAL',
+}
+solver.SetTimeLimit(60000)
+
+status = solver.Solve()
+STATUS[status]
+
+for i in range(node_count):
+    print([x[i][j].solution_value() for j in range(node_count)])
+
+# # Local Search - Node Adjustment
+#
+
+import os
+from solver import randomized_opt2, view_tsp,local_search,two_opt_v2
+
+print(*ls('./data'),sep='\t')
+
+with open('./data/tsp_100_3') as fp:
+    content = fp.read().split('\n')
+
+
+# +
+node_count = int(content[0])
+points = []
+for i in range(1, node_count + 1):
+    line = content[i]
+    parts = line.split()
+    points.append(Point(float(parts[0]), float(parts[1])))
+
+print(f'#Nodes: {node_count}')
+
+d = []
+for i in range(node_count):
+    row =[distance(points[i],points[j]) for j in range(node_count)]
+    d.append(row)
+    
+np.shape(d)
+# -
+
+plt.figure(figsize=(6, 6))
+plt.scatter(
+    x=[p.x for p in points],
+    y=[p.y for p in points],
+)
+
+sol = randomized_opt2(points,5)
+
+view_tsp(sol,points)
+
+sol2 = local_search(sol,points)
+
+view_tsp(sol2,points,(12,12))

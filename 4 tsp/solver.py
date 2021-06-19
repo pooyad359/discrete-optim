@@ -9,6 +9,8 @@ import math
 from collections import namedtuple, deque
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
+import random
+import itertools
 
 Point = namedtuple("Point", ["x", "y"])
 
@@ -33,29 +35,52 @@ def solve_it(input_data):
 
     # build a trivial solution
     # visit the nodes in the order they appear in the file
-    mode = 2
+    mode = 1
     if nodeCount > 10000:
         mode = -1
     if mode == 0:
+        print("*** USING GREEDY + 2-OPT ***")
         solution = to_nearest(points)
-        for _ in range(2):
+        for _ in range(3):
             d = deque(solution)
-            d.rotate(5)
+            d.rotate(10)
             # d.rotate(len(solution) // 2)
             solution = two_opt(list(d), points)
 
-    if mode == 1:
+    elif mode == 1:
+        print("*** USING GREEDY + 2-OPT WITH RESTARTS ***")
         n_restart = 20
-        if len(points) > 1000:
+        if len(points) >= 1000:
             n_restart = 5
         solution = randomized_opt2(points, n_restart)
+
     elif mode == -1:
+        print("*** USING SAVED RESULTS ***")
         with open("./prob_6_nearest.sol") as fp:
             output = fp.read()
             return output
     elif mode == 2:
+        print("*** USING ORTOOL TSP MODULE ***")
         solution = ortools_solver(points)
+    elif mode == 3:
+        print("*** USING GREEDY + 2-OPT-V2 ***")
+        solution = to_nearest(points)
+        for _ in range(3):
+            d = deque(solution)
+            d.rotate(10)
+            solution = two_opt_v2(list(d), points)
+
+    elif mode == 1:
+        print("*** USING GREEDY + 2-OPT WITH RESTARTS ***")
+        n_restart = 20
+        if len(points) >= 1000:
+            n_restart = 5
+        solution = randomized_opt2(points, n_restart)
+        if len(points) < 1000:
+            solution = local_search(solution, points, 10)
+
     else:
+        print("*** USING GREEDY ALGORITHM ***")
         solution = to_nearest(points)
 
     # calculate the length of the tour
@@ -91,6 +116,8 @@ def view_tsp(solution, points, figsize=(8, 8)):
     #     plt.text(
     #         xi + 0.01, yi + 0.01, i, fontdict={"fontsize": 16, "color": "darkblue"}
     #     )
+    obj = loss(solution, points)
+    plt.title(f"{len(points)} Nodes    Objective = {obj:.1f}")
     plt.show()
 
 
@@ -127,6 +154,37 @@ def two_opt(route, points, max_iter=1000, eps=1e-5):
     return best
 
 
+def two_opt_v2(route, points, max_iter=1000, eps=1e-5, random_state=None):
+    random.seed(random_state)
+    best = route.copy()
+    improved = True
+    counter = 0
+    while improved and counter < max_iter:
+        counter += 1
+        value = loss(route, points)
+        print(f"#{counter:04.0f} \t{value}", flush=True)
+        improved = False
+
+        pairs = list(itertools.combinations(range(1, len(route)), 2))
+        random.shuffle(pairs)
+        for i, j in pairs:
+            if j - i == 1:
+                continue
+            if (
+                cost_change(
+                    points[best[i - 1]],
+                    points[best[i]],
+                    points[best[j - 1]],
+                    points[best[j]],
+                )
+                < -eps
+            ):
+                best[i:j] = best[j - 1 : i - 1 : -1]
+                improved = True
+        route = best
+    return best
+
+
 def randomized_opt2(points, restarts=1):
     if restarts > 1:
         solutions = []
@@ -142,10 +200,12 @@ def randomized_opt2(points, restarts=1):
     else:
         trial1 = np.random.permutation(len(points))
         np.random.shuffle(trial1)
-        solution = two_opt(trial1, points)
+        solution = two_opt_v2(trial1, points)
+        # solution = two_opt(trial1, points)
         trial2 = deque(solution)
         trial2.rotate(3)
-        return two_opt(list(trial2), points)
+        # return two_opt(list(trial2), points)
+        return two_opt_v2(list(trial2), points)
 
 
 def to_nearest(points):
@@ -202,6 +262,34 @@ def get_route(manager, routing, solution):
         route.append(new_index)
     route.pop(-1)
     return route
+
+
+def local_search(solution, points, max_iter=100):
+    node_count = len(points)
+    obj = loss(solution, points)
+    improved = True
+    counter = 0
+    while improved and counter < max_iter:
+        counter += 1
+        print(f"\t* local search: Iteration #{counter}")
+        improved = False
+        for i in range(node_count):
+            for j in range(node_count):
+                new_sol = solution.copy()
+                item = new_sol.pop(i)
+                new_sol.insert(j, item)
+                new_obj = loss(new_sol, points)
+                if new_obj < obj:
+                    print(f"\t{obj:.2f} --> {new_obj:.2f}")
+                    solution = new_sol.copy()
+                    obj = loss(solution, points)
+                    improved = True
+                    continue
+    if not improved:
+        print("No improvement observed.")
+    elif counter >= max_iter:
+        print("Max iteration reached.")
+    return solution
 
 
 def ortools_solver(points=None):
