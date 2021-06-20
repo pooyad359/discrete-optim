@@ -12,6 +12,8 @@ from ortools.constraint_solver import pywrapcp
 import random
 import itertools
 from tqdm.auto import trange
+from ortools.sat.python import cp_model
+from sklearn.neighbors import KDTree
 
 Point = namedtuple("Point", ["x", "y"])
 
@@ -50,7 +52,7 @@ def solve_it(input_data):
 
     elif mode == 1:
         print("*** USING GREEDY + 2-OPT WITH RESTARTS ***")
-        n_restart = 20
+        n_restart = 500
         if len(points) >= 1000:
             n_restart = 5
         solution = randomized_opt2(points, n_restart)
@@ -70,7 +72,20 @@ def solve_it(input_data):
             d = deque(solution)
             d.rotate(10)
             solution = two_opt_v2(list(d), points)
-
+    elif mode == 4:
+        print("*** USING CP + Filtered Neighbors ***")
+        optimal, solution = filtered_neighbors(points)
+        if not optimal:
+            print("\tThe solution is not optimal.")
+            print(f"\t\tLoss = {loss(solution, points)}")
+            print("\t*** Using 2-opt to improve the solution ***")
+            solution = two_opt_v2(solution, points)
+            print(f"\t\tLoss = {loss(solution, points)}")
+            print("\t*** Using 3-opt to improve the solution ***")
+            solution = three_opt(solution, points)
+            print(f"\t\tLoss = {loss(solution, points)}")
+            print("\t*** Using local search to improve the solution ***")
+            solution = local_search(solution, points)
     elif mode == 1:
         print("*** USING GREEDY + 2-OPT WITH RESTARTS ***")
         n_restart = 20
@@ -395,6 +410,192 @@ def ortools_solver(points=None):
         out = get_route(manager, routing, solution)
 
     return out
+
+
+# ---------------------- Constraint Programming -----------------------#
+def get_k_value(n):
+    """
+    50 nodes --> k = 5
+    100 nodes --> k = 8
+    """
+    k = 5 + 5 * np.log2(n / 50)
+    return int(k)
+
+
+def generate_tsp(node_count, random_state=None):
+    np.random.seed(random_state)
+    x = np.random.randint(100, size=node_count, dtype=int)
+    y = np.random.randint(100, size=node_count, dtype=int)
+    points = [Point(i, j) for i, j in zip(x, y)]
+    return points
+
+
+def view_matrix(mat, points, figsize=(8, 8)):
+    lines = []
+    #     row = np.argmax(sol_mat,axis=0)
+    row = np.arange(len(points))
+    col = np.argmax(mat, axis=1)
+    plt.figure(figsize=figsize)
+    for i, j in zip(row, col):
+        x = [points[i].x, points[j].x]
+        y = [points[i].y, points[j].y]
+        plt.plot(x, y, "ok-")
+
+
+def check_feasibility(sol_mat):
+    dest = np.argmax(sol_mat, axis=1)
+    return len(set(dest)) == sol_mat.shape[0]
+
+
+def matrix_to_route(matrix):
+    assert check_feasibility, "Invalid input matrix"
+    route = [0]
+    dest = np.argmax(matrix, axis=1)
+    n = len(dest)
+    for i in range(n):
+        route.append(dest[route[-1]])
+    final = route.pop(-1)
+    if final != 0:
+        raise Exception("The route is not complete.")
+    return route
+
+
+def filtered_neighbors(points):
+    node_count = len(points)
+
+    # Neighbor Detection
+    xy = np.array(points)
+    kdt = KDTree(xy)
+    k = get_k_value(node_count) + 1
+    dist, neighbors = kdt.query(xy, k)
+
+    # Create CP Model
+    model = cp_model.CpModel()
+
+    # Define Variables
+    a = []  # whether i and j are connected
+    u = []  # order of points
+    for i in range(node_count):
+        row = [model.NewBoolVar(f"a_{i}_{j}") for j in range(node_count)]
+        a.append(row)
+    u = [model.NewIntVar(0, node_count - 1, f"u_{i}") for i in range(node_count)]
+
+    # Add Constraints
+    for i in range(node_count):
+        model.AddAbsEquality(0, a[i][i])
+        model.Add(sum([a[i][j] for j in range(node_count)]) == 1)
+        model.Add(sum([a[j][i] for j in range(node_count)]) == 1)
+
+    for i in range(node_count - 1):
+        for j in range(i, node_count):
+            model.Add(a[i][j] + a[j][i] <= 1)
+
+    # Connectivity Constraint
+    model.AddAllDifferent(u)
+    for i in range(1, node_count):
+        for j in range(1, node_count):
+            if i == j:
+                continue
+            model.Add(u[i] - u[j] + node_count * a[i][j] <= node_count - 1)
+    model.Add(u[0] == 0)
+
+    # Proximity Constraint
+    for i in range(node_count):
+        neigh = neighbors[i, 1:]
+        for j in range(node_count):
+            if j not in neigh:
+                model.AddAbsEquality(0, a[i][j])
+                model.AddAbsEquality(0, a[j][i])
+
+    # Objective
+    obj = []
+    for i in range(node_count):
+        for j in range(node_count):
+            d = distance(points[i], points[j]) * 100
+            obj.append(int(d) * a[i][j])
+    model.Minimize(sum(obj))
+
+    # Solve
+    max_time = estimate_time(node_count)
+    cpsolver = cp_model.CpSolver()
+    cpsolver.parameters.max_time_in_seconds = max_time
+    status = cpsolver.Solve(model)
+    print(cpsolver.StatusName())
+
+    if status == cp_model.MODEL_INVALID or status == cp_model.INFEASIBLE:
+        raise RuntimeError("Unable to find a solution.")
+
+    # Extract Solution
+    sol_mat = []
+    for i in range(node_count):
+        row = [cpsolver.Value(a[i][j]) for j in range(node_count)]
+        sol_mat.append(row)
+    sol_mat = np.array(sol_mat)
+
+    # Convert solution to readable format
+    sol = matrix_to_route(sol_mat)
+
+    return status == cp_model.OPTIMAL, sol
+
+
+def estimate_time(node_count):
+    max_time = node_count * 3
+    return np.clip(max_time, 60, 600)
+
+
+# ------------------------- 3-OPT ------------------------------#
+def three_opt(route, points, random_state=None):
+    random.seed(random_state)
+    while True:
+        delta = 0
+        options = list(all_segments(len(route)))
+        random.shuffle(options)
+        for (a, b, c) in options:
+            route, change = reverse_segment_if_better(route, points, a, b, c)
+            delta += change
+        if delta >= 0:
+            break
+    return route
+
+
+def all_segments(n: int):
+    return (
+        (i, j, k)
+        for i in range(n)
+        for j in range(i + 2, n)
+        for k in range(j + 2, n + (i > 0))
+    )
+
+
+def reverse_segment_if_better(route, points, i, j, k):
+    point_dist = lambda p1, p2: ((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2) ** 0.5
+    new_route = route.copy()
+    A = points[new_route[i - 1]]
+    B = points[new_route[i]]
+    C = points[new_route[j - 1]]
+    D = points[new_route[j]]
+    E = points[new_route[k - 1]]
+    F = points[new_route[k % len(new_route)]]
+    d0 = point_dist(A, B) + point_dist(C, D) + point_dist(E, F)
+    d1 = point_dist(A, C) + point_dist(B, D) + point_dist(E, F)
+    d2 = point_dist(A, B) + point_dist(C, E) + point_dist(D, F)
+    d3 = point_dist(A, D) + point_dist(E, B) + point_dist(C, F)
+    d4 = point_dist(F, B) + point_dist(C, D) + point_dist(E, A)
+
+    if d0 > d1:
+        new_route[i:j] = reversed(new_route[i:j])
+        return new_route, -d0 + d1
+    elif d0 > d2:
+        new_route[j:k] = reversed(new_route[j:k])
+        return new_route, -d0 + d2
+    elif d0 > d4:
+        new_route[i:k] = reversed(new_route[i:k])
+        return new_route, -d0 + d4
+    elif d0 > d3:
+        tmp = new_route[j:k] + new_route[i:j]
+        new_route[i:k] = tmp
+        return new_route, -d0 + d3
+    return new_route, 0
 
 
 import sys
