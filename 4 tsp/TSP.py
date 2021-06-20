@@ -18,6 +18,7 @@
 
 # %load_ext autoreload
 # %autoreload 2
+# %load_ext nb_black
 
 # +
 import numpy as np
@@ -921,8 +922,6 @@ def filtered_neighbors(points):
 
 filtered_neighbors(points)
 
-# %debug
-
 xy = np.array(points)
 kdt = KDTree(xy)
 
@@ -1019,12 +1018,285 @@ view_tsp(sol,points)
 sol2 = two_opt_v2(sol,points)
 view_tsp(sol2,points)
 
-np.random.randint(0,5,(3,3))
-
-np.sum(_,axis=1)
-
-q = 10
-f'{np.log(q)=}'
-
-# # 
+# # Dantzig–Fulkerson–Johnson formulation
 #     
+
+from sklearn.neighbors import KDTree
+from solver import load_data
+import numpy as np
+from ortools.sat.python import cp_model
+
+
+# +
+def generate_tsp(node_count, random_state = None):
+    np.random.seed(random_state)
+    x = np.random.randint(100,size=node_count,dtype=int)
+    y = np.random.randint(100,size=node_count,dtype=int)
+    points = [Point(i,j) for i,j in zip(x,y)]
+    return points
+
+def view_matrix(mat,points,figsize = (8,8)):
+    lines = []
+#     row = np.argmax(sol_mat,axis=0)
+    row = np.arange(len(points))
+    col = np.argmax(sol_mat,axis=1)
+    plt.figure(figsize=figsize)
+    for i,j in zip(row,col):
+        x = [points[i].x,points[j].x]
+        y = [points[i].y,points[j].y]
+        plt.plot(x,y,'ok-')
+        
+def check_feasibility(sol_mat):
+    dest = np.argmax(sol_mat,axis=1)
+    return len(set(dest))==sol_mat.shape[0]
+
+def matrix_to_route(matrix):
+    assert check_feasibility, 'Invalid input matrix'
+    route = [0]
+    dest = np.argmax(matrix,axis = 1)
+    n = len(dest)
+    for i in range(n):
+        route.append(dest[route[-1]])
+    final = route.pop(-1)
+    if final!=0:
+        raise Exception('The route is not complete.')
+    return route
+
+
+# +
+node_count, points = load_data('tsp_51_1')
+
+
+# node_count=20
+# points = generate_tsp(node_count,23)
+
+plt.figure(figsize=(6, 6))
+plt.scatter(
+    x=[p.x for p in points],
+    y=[p.y for p in points],
+)
+
+
+# +
+def get_k_value(n):
+    '''
+    50 nodes --> k = 5
+    100 nodes --> k = 8
+    '''
+    k = 5 + 3*np.log2(n/50)
+    return int(k)
+
+
+
+# +
+def get_subgraph(matrix):
+    node_count = matrix.shape[0]
+    graph = nx.Graph()
+    graph.add_nodes_from(range(node_count))
+
+    p2 = matrix.argmax(axis=1)
+    for i, p in enumerate(p2):
+        graph.add_edge(i, p)
+
+    sub_graphs = list(nx.connected_components(graph))
+    sizes = [len(sg) for sg in sub_graphs]
+    sub_graphs.pop(np.argmax(sizes))
+    return sub_graphs
+
+
+# -
+
+subgraphs = []
+
+
+subgraphs.extend(new_subgraphs)
+
+# +
+# def filtered_neighbors(points):
+
+# node_count = len(points)
+
+# Neighbor Detection
+xy = np.array(points)
+kdt = KDTree(xy)
+k = get_k_value(node_count) + 1
+dist, neighbors = kdt.query(xy, k)
+
+# Create CP Model
+model = cp_model.CpModel()
+
+# Define Variables
+a = []  # whether i and j are connected
+# u = [] # order of points
+for i in range(node_count):
+    row = [model.NewBoolVar(f"a_{i}_{j}") for j in range(node_count)]
+    a.append(row)
+# u = [model.NewIntVar(0,node_count-1,f'u_{i}') for i in range(node_count)]
+
+# Add Constraints
+for i in range(node_count):
+    model.AddAbsEquality(0, a[i][i])
+    model.Add(sum([a[i][j] for j in range(node_count)]) == 1)
+    model.Add(sum([a[j][i] for j in range(node_count)]) == 1)
+
+for i in range(node_count - 1):
+    for j in range(i, node_count):
+        model.Add(a[i][j] + a[j][i] <= 1)
+
+# Connectivity Constraint
+# model.AddAllDifferent(u)
+# for i in range(1,node_count):
+#     for j in range(1,node_count):
+#         if i==j: continue
+#         model.Add(u[i]-u[j]+node_count*a[i][j]<=node_count-1)
+# model.Add(u[0]==0)
+
+# Proximity Constraint
+for i in range(node_count):
+    neigh = neighbors[i, 1:]
+    for j in range(node_count):
+        if j not in neigh:
+            model.AddAbsEquality(0, a[i][j])
+            model.AddAbsEquality(0, a[j][i])
+
+# Remove Subgraphs
+for sg in subgraphs:
+    subsum = 0
+    for i in sg:
+        subsum += sum([a[i][j] for j in sg])
+    model.Add(subsum <= (len(sg) - 1))
+
+# Objective
+obj = []
+for i in range(node_count):
+    for j in range(node_count):
+        d = distance(points[i], points[j]) * 100
+        obj.append(int(d) * a[i][j])
+model.Minimize(sum(obj))
+
+# Solve
+cpsolver = cp_model.CpSolver()
+cpsolver.parameters.max_time_in_seconds = 60.0
+status = cpsolver.Solve(model)
+print(cpsolver.StatusName())
+
+if status == cp_model.MODEL_INVALID or status == cp_model.INFEASIBLE:
+    raise RuntimeError("Unable to find a solution.")
+
+# Extract Solution
+sol_mat = []
+for i in range(node_count):
+    row = [cpsolver.Value(a[i][j]) for j in range(node_count)]
+    sol_mat.append(row)
+sol_mat = np.array(sol_mat)
+
+# Convert solution to readable format
+# sol = matrix_to_route(sol_mat)
+
+# return status == cp_model.OPTIMAL, sol
+# -
+
+new_subgraphs = get_subgraph(sol_mat)
+
+view_matrix(sol_mat, points)
+
+sol = matrix_to_route(sol_mat)
+view_tsp(sol, points)
+
+filtered_neighbors(points)
+
+xy = np.array(points)
+kdt = KDTree(xy)
+
+dist, neighbors = kdt.query(xy,6)
+neighbors[0]
+
+model = cp_model.CpModel()
+
+a = [] # whether i and j are connected
+u = [] # order of points
+for i in range(node_count):
+    row = [model.NewBoolVar(f'a_{i}_{j}') for j in range(node_count)]
+    a.append(row)
+u = [model.NewIntVar(0,node_count-1,f'u_{i}') for i in range(node_count)]
+
+# +
+# Add Constraints
+for i in range(node_count):
+    model.AddAbsEquality(0, a[i][i])
+    model.Add(sum([ a[i][j] for j in range(node_count)])==1)
+    model.Add(sum([ a[j][i] for j in range(node_count)])==1)
+
+for i in range(node_count-1):
+    for j in range(i,node_count):
+        model.Add(a[i][j]+a[j][i]<=1)
+
+# for i in range(node_count-2):
+#     for j in range(i,node_count-1):
+#         for k in range(j,node_count):
+#             model.Add(a[i][j]+a[j][k]+a[k][i]<=2)
+#             model.Add(a[j][i]+a[i][k]+a[k][j]<=2)
+            
+model.AddAllDifferent(u)
+
+for i in range(1,node_count):
+    for j in range(1,node_count):
+        if i==j: continue
+        model.Add(u[i]-u[j]+node_count*a[i][j]<=node_count-1)
+model.Add(u[0]==0)
+# model.Add(u[-1]==node_count)
+# -
+
+for i in range(node_count):
+    neigh = neighbors[i,1:]
+    for j in range(node_count):
+        if j not in neigh:
+            model.AddAbsEquality(0,a[i][j])
+            model.AddAbsEquality(0,a[j][i])
+
+
+# Objective
+obj = []
+for i in range(node_count):
+    for j in range(node_count):
+        d = distance(points[i],points[j])*100
+        obj.append(int(d)*a[i][j])
+model.Minimize(sum(obj))
+
+cpsolver = cp_model.CpSolver()
+cpsolver.parameters.max_time_in_seconds = 60.0
+status = cpsolver.Solve(model)
+
+# STATUS = {
+#     cp_model.FEASIBLE: 'FEASIBLE',
+#     cp_model.UNKNOWN: 'UNKNOWN',
+#     cp_model.MODEL_INVALID: 'MODEL_INVALID',
+#     cp_model.INFEASIBLE: 'INFEASIBLE',
+#     cp_model.OPTIMAL: 'OPTIMAL',
+# }
+# STATUS[status]
+cpsolver.StatusName()
+
+# +
+sol_mat = []
+for i in range(node_count):
+    row = [cpsolver.Value(a[i][j]) for j in range(node_count)]
+    sol_mat.append(row)
+    print(row)
+    
+sol_mat = np.array(sol_mat)
+
+# -
+
+np.argmax(sol_mat,axis=0)
+
+view_matrix(sol_mat,points)
+
+
+
+sol = matrix_to_route(sol_mat)
+
+view_tsp(sol,points)
+
+sol2 = two_opt_v2(sol,points)
+view_tsp(sol2,points)

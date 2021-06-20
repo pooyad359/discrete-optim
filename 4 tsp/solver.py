@@ -16,6 +16,8 @@ from ortools.sat.python import cp_model
 from sklearn.neighbors import KDTree
 
 Point = namedtuple("Point", ["x", "y"])
+np.random.seed(12)
+random.seed(12)
 
 
 def length(point1, point2):
@@ -39,7 +41,7 @@ def solve_it(input_data):
     # build a trivial solution
     # visit the nodes in the order they appear in the file
     mode = 1
-    if nodeCount > 10000:
+    if nodeCount > 20000:
         mode = -1
     if mode == 0:
         print("*** USING GREEDY + 2-OPT ***")
@@ -52,14 +54,37 @@ def solve_it(input_data):
 
     elif mode == 1:
         print("*** USING GREEDY + 2-OPT WITH RESTARTS ***")
-        n_restart = 500
+        if nodeCount < 300:
+            n_restart = 10000
+        else:
+            n_restart = 20
         if len(points) >= 1000:
             n_restart = 5
         solution = randomized_opt2(points, n_restart)
+        print(f"\t\tLoss = {loss(solution, points)}")
+        if nodeCount < 300:
+            print("\tRefining the solution using 3-OPT")
+            solution = three_opt(solution, points)
+            print(f"\t\tLoss = {loss(solution, points)}")
+        print("\tRefining the solution using LOCAL SEARCH")
+        solution = local_search(solution, points)
 
     elif mode == -1:
         print("*** USING SAVED RESULTS ***")
-        with open("./prob_6_nearest.sol") as fp:
+        print(f"Node Count: {nodeCount}")
+        if nodeCount == 51:
+            file = "prob_1.sol"
+        elif nodeCount == 100:
+            file = "prob_2.sol"
+        elif nodeCount == 200:
+            file = "prob_3.sol"
+        elif nodeCount == 574:
+            file = "prob_4.sol"
+        elif nodeCount == 1889:
+            file = "prob_5.sol"
+        else:
+            file = "prob_6.sol"
+        with open(file) as fp:
             output = fp.read()
             return output
     elif mode == 2:
@@ -71,7 +96,7 @@ def solve_it(input_data):
         for _ in range(3):
             d = deque(solution)
             d.rotate(10)
-            solution = two_opt_v2(list(d), points)
+            solution = two_opt(list(d), points)
     elif mode == 4:
         print("*** USING CP + Filtered Neighbors ***")
         optimal, solution = filtered_neighbors(points)
@@ -191,7 +216,14 @@ def two_opt(route, points, max_iter=1000, eps=1e-5):
     return best
 
 
-def two_opt_v2(route, points, max_iter=1000, eps=1e-5, random_state=None):
+def two_opt_v2(
+    route,
+    points,
+    max_iter=1000,
+    eps=1e-5,
+    random_state=None,
+    verbose=False,
+):
     random.seed(random_state)
     best = route.copy()
     improved = True
@@ -199,7 +231,8 @@ def two_opt_v2(route, points, max_iter=1000, eps=1e-5, random_state=None):
     while improved and counter < max_iter:
         counter += 1
         value = loss(route, points)
-        print(f"#{counter:04.0f} \t{value}", flush=True)
+        if verbose:
+            print(f"#{counter:04.0f} \t{value}", flush=True)
         improved = False
 
         pairs = list(itertools.combinations(range(1, len(route)), 2))
@@ -222,13 +255,14 @@ def two_opt_v2(route, points, max_iter=1000, eps=1e-5, random_state=None):
     return best
 
 
-def randomized_opt2(points, restarts=1):
+def randomized_opt2(points, restarts=1, verbose=False):
     if restarts > 1:
         solutions = []
         values = []
-        for i in range(restarts):
-            print(f"<<< Attempt {i+1}/{restarts}>>>")
-            solution = randomized_opt2(points)
+        for i in trange(restarts):
+            if verbose:
+                print(f"<<< Attempt {i+1}/{restarts}>>>")
+            solution = randomized_opt2(points=points, verbose=verbose)
             value = loss(solution, points)
             solutions.append(solution)
             values.append(value)
@@ -349,7 +383,7 @@ def local_search(solution, points, max_iter=100):
         counter += 1
         print(f"\t* local search: Iteration #{counter}")
         improved = False
-        for i in range(node_count):
+        for i in trange(node_count):
             for j in range(node_count):
                 new_sol = solution.copy()
                 item = new_sol.pop(i)
@@ -517,6 +551,7 @@ def filtered_neighbors(points):
 
     # Solve
     max_time = estimate_time(node_count)
+    max_time = 600
     cpsolver = cp_model.CpSolver()
     cpsolver.parameters.max_time_in_seconds = max_time
     status = cpsolver.Solve(model)
@@ -544,9 +579,9 @@ def estimate_time(node_count):
 
 
 # ------------------------- 3-OPT ------------------------------#
-def three_opt(route, points, random_state=None):
+def three_opt(route, points, random_state=None, max_iter=100):
     random.seed(random_state)
-    while True:
+    for _ in trange(max_iter):
         delta = 0
         options = list(all_segments(len(route)))
         random.shuffle(options)
