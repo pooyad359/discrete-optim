@@ -162,7 +162,7 @@ def distance(point1, point2):
     return math.sqrt((point1.x - point2.x) ** 2 + (point1.y - point2.y) ** 2)
 
 
-def view_tsp(solution, points, figsize=(8, 8)):
+def view_tsp(solution, points, figsize=(8, 8), show_index=False):
     """
     List of points
     """
@@ -174,10 +174,11 @@ def view_tsp(solution, points, figsize=(8, 8)):
     plt.plot(x, y, "ok-")
     plt.plot(x[0], y[0], "sr", markersize=12)
     plt.plot(x[-1], y[-1], "*g", markersize=16)
-    # for i, (xi, yi) in enumerate(xy):
-    #     plt.text(
-    #         xi + 0.01, yi + 0.01, i, fontdict={"fontsize": 16, "color": "darkblue"}
-    #     )
+    if show_index:
+        for i, (xi, yi) in enumerate(xy):
+            plt.text(
+                xi + 0.01, yi + 0.01, i, fontdict={"fontsize": 16, "color": "darkblue"}
+            )
     obj = loss(solution, points)
     plt.title(f"{len(points)} Nodes    Objective = {obj:.1f}")
     plt.show()
