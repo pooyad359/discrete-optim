@@ -638,7 +638,6 @@ from solver import load_data, two_opt_v2, local_search
 from tqdm.auto import trange
 
 
-# +
 def dynamic_greedy(points,trials = 1,shuffle=False, random_state=None):
     assert isinstance(trials,int) and trials>0, 'Invalid number for trials.'
     random.seed(random_state)
@@ -676,8 +675,6 @@ def dynamic_greedy(points,trials = 1,shuffle=False, random_state=None):
     route = [points.index(p) for p in sol]
     return route
 
-
-# -
 
 node_count,points = load_data('tsp_100_3')
 
@@ -841,7 +838,6 @@ def get_k_value(n):
     return int(k)
 
 
-# +
 def filtered_neighbors(points):
     node_count = len(points)
     
@@ -917,8 +913,6 @@ def filtered_neighbors(points):
     
     return status == cp_model.OPTIMAL, sol
 
-    
-# -
 
 filtered_neighbors(points)
 
@@ -1077,7 +1071,8 @@ plt.scatter(
 )
 
 
-# +
+# -
+
 def get_k_value(n):
     '''
     50 nodes --> k = 5
@@ -1088,7 +1083,6 @@ def get_k_value(n):
 
 
 
-# +
 def get_subgraph(matrix):
     node_count = matrix.shape[0]
     graph = nx.Graph()
@@ -1103,8 +1097,6 @@ def get_subgraph(matrix):
     sub_graphs.pop(np.argmax(sizes))
     return sub_graphs
 
-
-# -
 
 subgraphs = []
 
