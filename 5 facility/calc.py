@@ -37,3 +37,11 @@ def validate(allocations, customers, facilities):
 
 def length(point1, point2):
     return math.sqrt((point1.x - point2.x) ** 2 + (point1.y - point2.y) ** 2)
+
+
+def distance_matrix(customers, facilities):
+    pf = np.array([f.location for f in facilities])
+    pc = np.array([c.location for c in customers])
+    diff = (pf[:, None, :] - pc[None, :, :]) ** 2
+    dist = diff.sum(axis=2) ** 0.5
+    return dist
