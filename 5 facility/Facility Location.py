@@ -130,7 +130,173 @@ validate(sol2,customers,facilities)
 
 # ### Uncapacitated Facilities
 
-from ortools.sat.python.cp_model import CpModel, CpSolver
+from ortools.sat.python import cp_model
+from calc import distance_matrix
 
+
+customers,facilities= load_data('fl_100_1')
+n_cust = len(customers)
+n_fac = len(facilities)
+
+
+caps = [f.capacity for f in facilities]
+setup = [f.setup_cost for f in facilities]
+dist = distance_matrix(customers,facilities).astype(int)
+demands = [c.demand for c in customers]
+
+model = cp_model.CpModel()
+
+a = [] # allocation matrix (facilities x customers)
+for f in range(n_fac):
+    a.append([model.NewBoolVar(f'a_{c}_{f}') for c in range(n_cust)])
+
+# +
+# Only one facility per customer
+for c in range(n_cust):
+    model.Add(sum([a[f][c] for f in range(n_fac)])==1)
+    
+# Capacity check
+for f in range(n_fac):
+    model.Add(sum([a[f][c]*demands[c] for c in range(n_cust)])<=caps[f])
+# -
+
+obj = 0
+for f in range(n_fac):
+    for c in range(n_cust):
+        obj+=a[f][c]*dist[f,c]
+
+model.Minimize(obj)
+
+cpsolver = cp_model.CpSolver()
+cpsolver.parameters.max_time_in_seconds = 60.0
+status = cpsolver.Solve(model)
+
+STATUS = {
+    cp_model.FEASIBLE: 'FEASIBLE',
+    cp_model.UNKNOWN: 'UNKNOWN',
+    cp_model.MODEL_INVALID: 'MODEL_INVALID',
+    cp_model.INFEASIBLE: 'INFEASIBLE',
+    cp_model.OPTIMAL: 'OPTIMAL',
+}
+STATUS[status]
+
+# +
+values = [] # allocation matrix (facilities x customers)
+for f in range(n_fac):
+    values.append([cpsolver.Value(a[f][c]) for c in range(n_cust)])
+
+values = np.array(values)
+
+sol = values.argmax(axis=0)
+# -
+
+total_cost(sol,customers,facilities)
+
+view_solution(sol,customers,facilities)
+
+# ## Solve for set number of facilities
+
+import math
+from sklearn.cluster import KMeans
+from sklearn.neighbors import KDTree
+from calc import total_demand, total_cost
+from tqdm.auto import trange
+
+q = [2,3,5,3,1]
+
+np.cumsum(sorted(q))
+
+
+# +
+def min_facilities(customers, facilities):
+    caps = [f.capacity for f in facilities]
+    cumsum = np.cumsum(sorted(caps))
+    demands = [c.demand for c in customers]
+    total_demand = sum(demands)
+    for i in range(len(facilities)):
+        if cumsum[i]>=total_demand:
+            print(f'Demand = {total_demand}, Capacity = {cumsum[i]}')
+            return i+1
+    
+#     return math.ceil(total_demand/max(caps))
+
+
+# -
+
+min_facilities(customers,facilities)
+
+customers, facilities = load_data('fl_100_1')
+n_cust = len(customers)
+n_fac = len(facilities)
+n_cust,n_fac
+
+
+# +
+# total_demand(customers)
+
+# +
+# [f.capacity for f in facilities]
+# -
+
+def clustering(customers, facilities):
+    n_cust = len(customers)
+    n_fac = len(facilities)
+    
+    # Find minimum number of clusters
+    min_fac = min_facilities(customers,facilities)
+    
+    # Find cluster centroids
+    kmean = KMeans(min_fac)
+    xy = np.array([c.location for c in customers])
+    kmean.fit(xy)
+    centroids = kmean.cluster_centers_
+    
+    # Find the distance between facilities and centroids
+    fneigh = KDTree(np.array([f.location for f in facilities]))
+    dist, locs = fneigh.query(centroids,min_fac)
+    
+    # Match facilities with centroids
+    inactive_facs = set(range(n_fac))
+    active_facs = []
+    for i in range(min_fac):
+        for j in range(min_fac):
+            if locs[i,j] in inactive_facs:
+                inactive_facs = inactive_facs - {locs[i,j]}
+                active_facs.append(locs[i,j])
+                break
+    
+    # Assign facilities to customers
+    turn = 0
+    remaining_cap = [facilities[f].capacity for f in active_facs]
+    remaining_cust = set(range(n_cust))
+    max_iter = len(active_facs)*n_cust
+    sol = -np.ones(n_cust,dtype=int)
+    pbar = trange(n_cust)
+    for _ in range(max_iter):
+        turn +=1
+        turn %=len(active_facs)
+        turn_fac = active_facs[turn]
+        kd_cust = KDTree(np.array([customers[c].location for c in list(remaining_cust)]))
+        dist, pot_cust = kd_cust.query([facilities[turn_fac].location],1)
+        pot_cust = list(remaining_cust)[pot_cust[0][0]]
+        if remaining_cap[turn]<customers[pot_cust].demand:
+            continue
+        else:
+            pbar.update()
+            sol[pot_cust] = turn_fac
+            remaining_cust = remaining_cust - {pot_cust}
+            remaining_cap[turn]-=customers[pot_cust].demand
+        if min(sol)>=0:
+            break
+    else:
+        IterationError('Maximum number of iteration reached.')
+    return sol
+
+
+sol = clustering(customers,facilities)
+
+sol
+
+view_solution(sol,customers,facilities,(16,16))
 
 
