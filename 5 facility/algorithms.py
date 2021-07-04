@@ -52,7 +52,7 @@ def random_allocation(customers, facilities):
     return allocations.astype(int)
 
 
-def local_search(solution, customers, facilities, verbose=False):
+def ex_local_search(solution, customers, facilities, verbose=False):
     allocations = solution.copy()
     n_cutomers = len(customers)
     n_facilities = len(facilities)

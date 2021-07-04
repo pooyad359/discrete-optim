@@ -7,8 +7,8 @@ def view_problem(customers, facilities, figsize=(8, 8)):
     loc_cust = np.array([c.location for c in customers])
     loc_fac = np.array([f.location for f in facilities])
     plt.figure(figsize=figsize)
-    plt.scatter(loc_cust[:, 0], loc_cust[:, 1], marker="o", c="k", s=5)
-    plt.scatter(loc_fac[:, 0], loc_fac[:, 1], marker="*", c="r", s=5)
+    plt.scatter(loc_cust[:, 0], loc_cust[:, 1], marker="o", c="k", s=15)
+    plt.scatter(loc_fac[:, 0], loc_fac[:, 1], marker="*", c="r", s=100)
 
     plt.title(f"{len(customers)} Customers    {len(facilities)} Facilities")
 

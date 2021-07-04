@@ -6,7 +6,7 @@ import math
 from os.path import join
 import os
 from calc import length, total_cost
-from algorithms import greedy, local_search, random_allocation, clustering
+from algorithms import greedy, ex_local_search, random_allocation, clustering
 
 ls = os.listdir
 
@@ -66,7 +66,7 @@ def solve_it(input_data):
     mode = 1
     if mode == 0:
         solution = greedy(customers, facilities)
-        solution = local_search(solution, customers, facilities, True)
+        solution = ex_local_search(solution, customers, facilities, True)
     elif mode == 1:
         solution = clustering(customers, facilities)
     else:
