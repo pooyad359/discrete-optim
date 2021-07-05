@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from calc import total_cost
+from calc import total_cost, validate
 
 
 def view_problem(customers, facilities, figsize=(8, 8)):
@@ -30,8 +30,13 @@ def view_solution(solution, customers, facilities, figsize=(8, 8)):
     plt.scatter(loc_fac[:, 0], loc_fac[:, 1], marker="*", c="r", s=5)
 
     cost = total_cost(solution, customers, facilities)
+    s = ""
+    try:
+        validate(solution, customers, facilities)
+    except AssertionError:
+        s = "*"
     plt.title(
-        f"{len(customers)} Customers    {len(facilities)} Facilities   Total Cost = {cost:.1f}"
+        f"{len(customers)} Customers    {len(facilities)} Facilities   Total Cost{s} = {cost:.1f}"
     )
     for c, f in enumerate(solution):
         x = [facilities[f].location.x, customers[c].location.x]

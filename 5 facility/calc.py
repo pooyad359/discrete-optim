@@ -7,16 +7,17 @@ def total_demand(customers):
 
 
 def total_cost(allocations, customers, facilities):
+    m = 1
     try:
         validate(allocations, customers, facilities)
     except AssertionError:
-        return np.inf
+        m = 10
     used_facilities = set(allocations)
     capital = sum([facilities[f].setup_cost for f in used_facilities])
     travelling_cost = 0
     for c, f in enumerate(allocations):
         travelling_cost += length(customers[c].location, facilities[f].location)
-    return capital + travelling_cost
+    return (capital + travelling_cost) * m
 
 
 def validate(allocations, customers, facilities):
