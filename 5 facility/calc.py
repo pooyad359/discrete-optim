@@ -57,3 +57,16 @@ def min_facilities(customers, facilities):
         if cumsum[i] >= total_demand:
             print(f"Demand = {total_demand}, Capacity = {cumsum[i]}")
             return i + 1
+
+
+def diagnose(allocations, customers, facilities):
+    open_facilities = set(allocations)
+    output = []
+    for f in open_facilities:
+        capacity = facilities[f].capacity
+        allocated_customers = np.where(np.array(allocations) == f)[0]
+        demand = sum([customers[c].demand for c in allocated_customers])
+        print(f"{demand}/{capacity}")
+        spare = capacity - demand
+        output.append([f, demand, capacity, spare])
+    return np.array(output)
