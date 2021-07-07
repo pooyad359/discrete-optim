@@ -56,7 +56,7 @@ def random_allocation(customers, facilities):
     return allocations.astype(int)
 
 
-def ex_local_search(solution, customers, facilities, verbose=False):
+def ex_local_search(solution, customers, facilities, njobs=1):
     allocations = solution.copy()
     n_cutomers = len(customers)
     n_facilities = len(facilities)
@@ -66,18 +66,27 @@ def ex_local_search(solution, customers, facilities, verbose=False):
         customer = customers[i]
         costs = np.zeros(n_facilities)
         old_alloc = allocations[i]
-        for j in range(n_facilities):
-            allocations[i] = j
-            costs[j] = total_cost(allocations, customers, facilities)
+
+        parallel = Parallel(n_jobs=njobs)
+        delayed_func = delayed(eval_swap_values)
+        costs = parallel(
+            delayed_func(
+                allocations=allocations,
+                customers=customers,
+                facilities=facilities,
+                customer=i,
+                new_facility=j,
+            )
+            for j in range(n_facilities)
+        )
         new_alloc = np.argmin(costs)
         allocations[i] = new_alloc
-        if verbose:
-            desc = "{:.1f} --> {:.1f} --> {:.1f}".format(
-                old_cost,
-                costs[old_alloc],
-                costs[new_alloc],
-            )
-            pbar.set_description(desc)
+        desc = "{:.1f} --> {:.1f} --> {:.1f}".format(
+            old_cost,
+            costs[old_alloc],
+            costs[new_alloc],
+        )
+        pbar.set_description(desc)
     return allocations
 
 
@@ -136,44 +145,6 @@ def clustering(customers, facilities):
     else:
         IterationError("Maximum number of iteration reached.")
     return sol
-
-
-def ex_local_search_v2(solution, customers, facilities, verbose=False):
-    allocations = solution.copy()
-    n_cutomers = len(customers)
-    n_facilities = len(facilities)
-    old_cost = total_cost(allocations, customers, facilities)
-    pbar = trange(n_cutomers)
-    for i in pbar:
-        customer = customers[i]
-        costs = np.zeros(n_facilities)
-        old_alloc = allocations[i]
-
-        parallel = Parallel(n_jobs=-1)
-        delayed_func = delayed(eval_swap_values)
-        costs = parallel(
-            delayed_func(
-                allocations=allocations,
-                customers=customers,
-                facilities=facilities,
-                customer=i,
-                new_facility=j,
-            )
-            for j in range(n_facilities)
-        )
-        #         for j in range(n_facilities):
-        #             allocations[i] = j
-        #             costs[j] = total_cost(allocations, customers, facilities)
-        new_alloc = np.argmin(costs)
-        allocations[i] = new_alloc
-        if verbose:
-            desc = "{:.1f} --> {:.1f} --> {:.1f}".format(
-                old_cost,
-                costs[old_alloc],
-                costs[new_alloc],
-            )
-            pbar.set_description(desc)
-    return allocations
 
 
 def eval_swap_values(allocations, customers, facilities, customer, new_facility):
