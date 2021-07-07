@@ -8,6 +8,25 @@ from joblib import Parallel, delayed
 from collections import Counter
 from operator import itemgetter
 from ortools.linear_solver.pywraplp import Solver
+from solver import Customer, Facility
+
+
+def double_trial(customers, facilities, solver):
+    # First attempt
+    solution = solver(customers, facilities)
+
+    # Choosing top facilities
+    min_fac = min_facilities(customers, facilities)
+    sorted_facs = sorted(Counter(solution).items(), key=itemgetter(1), reverse=True)
+    top_facs_idx = [f for f, i in sorted_facs[:min_fac]]
+    top_facs = [facilities[f] for f in top_facs_idx]
+
+    # Second Attempt
+    solution2 = greedy_furthest(customers, top_facs)
+
+    # Rearrange the solution
+    solution2 = [top_facs_idx[f] for f in solution2]
+    return solution2
 
 
 def greedy(customers, facilities, eps=1e-3):
@@ -34,6 +53,29 @@ def greedy(customers, facilities, eps=1e-3):
                 remaining_capacity += customer.demand
                 break
     return allocations.astype(int)
+
+
+def greedy_furthest(customers, facilities, ignore_setup=True):
+    dist = distance_matrix(customers, facilities)
+    n_cust = len(customers)
+    n_fac = len(facilities)
+    solution = -np.ones(n_cust)
+    opened_fac = np.zeros(n_fac)
+    remaining_cap = np.array([f.capacity for f in facilities])
+    setup_cost = np.array([f.setup_cost for f in facilities])
+    dist_ord = dist.mean(axis=0).argsort()
+    for c in tqdm(reversed(dist_ord), total=n_cust):
+        customer = customers[c]
+        choice_cost = dist[:, c]
+        if not ignore_setup:
+            choice_cost += (1 - opened_fac) * setup_cost
+        for f in np.argsort(choice_cost):
+            if remaining_cap[f] >= customer.demand:
+                opened_fac[f] = 1
+                remaining_cap[f] -= customer.demand
+                solution[c] = f
+                break
+    return solution.astype(int)
 
 
 def random_allocation(customers, facilities):
@@ -306,7 +348,7 @@ def cap_mip(customers, facilities, max_time=60):
 
     obj = 0
     for f in range(n_fac):
-        #     obj += setup[f]*x[f]
+        obj += setup[f] * x[f]
         obj += sum([dist[f][c] * y[f][c] for c in range(n_cust)])
 
     solver.Minimize(obj)

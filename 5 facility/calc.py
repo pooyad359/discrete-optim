@@ -41,8 +41,12 @@ def length(point1, point2):
 
 
 def distance_matrix(customers, facilities):
-    pf = np.array([f.location for f in facilities])
-    pc = np.array([c.location for c in customers])
+    if isinstance(customers, list):
+        pf = np.array([f.location for f in facilities])
+        pc = np.array([c.location for c in customers])
+    else:
+        pf = facilities
+        pc = customers
     diff = (pf[:, None, :] - pc[None, :, :]) ** 2
     dist = diff.sum(axis=2) ** 0.5
     return dist

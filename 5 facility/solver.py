@@ -6,7 +6,7 @@ import math
 from os.path import join
 import os
 from calc import length, total_cost
-from algorithms import greedy, ex_local_search, random_allocation, clustering
+from algorithms import cap_mip, greedy, ex_local_search, random_allocation, clustering
 
 ls = os.listdir
 
@@ -19,6 +19,47 @@ def load_data(file, prefix="data"):
     with open(join(prefix, file)) as fp:
         content = fp.read()
     return parse_input(content)
+
+
+def solve_it(input_data):
+    # Modify this code to run your optimization algorithm
+
+    # parse the input
+    customers, facilities = parse_input(input_data)
+    facility_count = len(facilities)
+    customer_count = len(customers)
+
+    # Solution
+    # Selecting the solver
+    if facility_count * customer_count < 50_000:
+        mode = 2
+    else:
+        mode = 1
+
+    # Applying the solver
+    if mode == 0:
+        solution = greedy(customers, facilities)
+        solution = ex_local_search(solution, customers, facilities, True)
+        status = "FEASIBLE"
+    elif mode == 1:
+        solution = clustering(customers, facilities)
+        status = "FEASIBLE"
+    elif mode == 2:
+        solution, status = cap_mip(customers, facilities)
+        print(f'MIP Solver finished with status "{status}"')
+    else:
+        solution = greedy(customers, facilities)
+        status = "FEASIBLE"
+
+    # calculate the cost of the solution
+
+    obj = total_cost(solution, customers, facilities)
+    # prepare the solution in the specified output format
+    status_code = 1 if status == "OPTIMAL" else 0
+    output_data = "%.2f" % obj + " " + str(status_code) + "\n"
+    output_data += " ".join(map(str, solution))
+
+    return output_data
 
 
 def parse_input(input_data):
@@ -52,34 +93,6 @@ def parse_input(input_data):
         )
 
     return customers, facilities
-
-
-def solve_it(input_data):
-    # Modify this code to run your optimization algorithm
-
-    # parse the input
-    customers, facilities = parse_input(input_data)
-    facility_count = len(facilities)
-    customer_count = len(customers)
-
-    # Solution
-    mode = 1
-    if mode == 0:
-        solution = greedy(customers, facilities)
-        solution = ex_local_search(solution, customers, facilities, True)
-    elif mode == 1:
-        solution = clustering(customers, facilities)
-    else:
-        solution = greedy(customers, facilities)
-
-    # calculate the cost of the solution
-
-    obj = total_cost(solution, customers, facilities)
-    # prepare the solution in the specified output format
-    output_data = "%.2f" % obj + " " + str(0) + "\n"
-    output_data += " ".join(map(str, solution))
-
-    return output_data
 
 
 import sys
