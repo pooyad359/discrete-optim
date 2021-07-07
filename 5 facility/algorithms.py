@@ -8,7 +8,6 @@ from joblib import Parallel, delayed
 from collections import Counter
 from operator import itemgetter
 from ortools.linear_solver.pywraplp import Solver
-from solver import Customer, Facility
 
 
 def double_trial(customers, facilities, solver):

@@ -6,7 +6,8 @@ import math
 from os.path import join
 import os
 from calc import length, total_cost
-from algorithms import cap_mip, greedy, ex_local_search, random_allocation, clustering
+from algorithms import cap_mip, greedy, ex_local_search, random_allocation
+from algorithms import clustering, greedy_furthest, double_trial
 
 ls = os.listdir
 
@@ -32,21 +33,23 @@ def solve_it(input_data):
     # Solution
     # Selecting the solver
     if facility_count * customer_count < 50_000:
-        mode = 2
+        mode = 3
     else:
-        mode = 1
+        mode = 3
 
     # Applying the solver
+    status = "FEASIBLE"
     if mode == 0:
         solution = greedy(customers, facilities)
         solution = ex_local_search(solution, customers, facilities, True)
-        status = "FEASIBLE"
     elif mode == 1:
         solution = clustering(customers, facilities)
-        status = "FEASIBLE"
     elif mode == 2:
         solution, status = cap_mip(customers, facilities)
         print(f'MIP Solver finished with status "{status}"')
+    elif mode == 3:
+        print("Double trial with greedy")
+        solution = double_trial(customers, facilities, greedy_furthest)
     else:
         solution = greedy(customers, facilities)
         status = "FEASIBLE"
