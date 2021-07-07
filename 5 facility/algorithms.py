@@ -90,6 +90,55 @@ def ex_local_search(solution, customers, facilities, njobs=1):
     return allocations
 
 
+def k_local_search(solution, customers, facilities, k=5, njobs=1):
+    allocations = solution.copy()
+    n_cutomers = len(customers)
+    n_facilities = len(facilities)
+    old_cost = total_cost(allocations, customers, facilities)
+    pbar = trange(n_cutomers)
+    for i in pbar:
+        last_cost = total_cost(allocations, customers, facilities)
+        customer = customers[i]
+        costs = np.zeros(n_facilities)
+        old_alloc = allocations[i]
+
+        current_fac = solution[i]
+        closest_facs = find_k_neighbors([facilities[current_fac]], facilities, k)[0]
+        parallel = Parallel(n_jobs=njobs)
+        delayed_func = delayed(eval_swap_values)
+        costs = parallel(
+            delayed_func(
+                allocations=allocations,
+                customers=customers,
+                facilities=facilities,
+                customer=i,
+                new_facility=closest_facs[j],
+            )
+            for j in range(k)
+        )
+        new_alloc = closest_facs[np.argmin(costs)]
+        allocations[i] = new_alloc
+        desc = "{:.1f} --> {:.1f} --> {:.1f}".format(
+            old_cost,
+            last_cost,
+            min(costs),
+        )
+        pbar.set_description(desc)
+    return allocations
+
+
+def find_k_neighbors(x, y, k=1):
+    """
+    Finds k nearest neighbors for x in y. x and y are either Facilities or Customers,
+    and must have location property.
+    """
+    x = np.array([o.location for o in x])
+    y = np.array([o.location for o in y])
+    kdtree = KDTree(y)
+    dist, neighbors = kdtree.query(x, k)
+    return neighbors
+
+
 def clustering(customers, facilities):
     n_cust = len(customers)
     n_fac = len(facilities)
