@@ -1,9 +1,13 @@
 import numpy as np
-from calc import total_cost, total_demand, length, min_facilities
+from calc import total_cost, total_demand, length, min_facilities, distance_matrix
 from tqdm.auto import tqdm, trange
 from exceptions import *
 from sklearn.neighbors import KDTree
 from sklearn.cluster import KMeans
+from joblib import Parallel, delayed
+from collections import Counter
+from operator import itemgetter
+from ortools.linear_solver.pywraplp import Solver
 
 
 def greedy(customers, facilities, eps=1e-3):
@@ -132,3 +136,176 @@ def clustering(customers, facilities):
     else:
         IterationError("Maximum number of iteration reached.")
     return sol
+
+
+def ex_local_search_v2(solution, customers, facilities, verbose=False):
+    allocations = solution.copy()
+    n_cutomers = len(customers)
+    n_facilities = len(facilities)
+    old_cost = total_cost(allocations, customers, facilities)
+    pbar = trange(n_cutomers)
+    for i in pbar:
+        customer = customers[i]
+        costs = np.zeros(n_facilities)
+        old_alloc = allocations[i]
+
+        parallel = Parallel(n_jobs=-1)
+        delayed_func = delayed(eval_swap_values)
+        costs = parallel(
+            delayed_func(
+                allocations=allocations,
+                customers=customers,
+                facilities=facilities,
+                customer=i,
+                new_facility=j,
+            )
+            for j in range(n_facilities)
+        )
+        #         for j in range(n_facilities):
+        #             allocations[i] = j
+        #             costs[j] = total_cost(allocations, customers, facilities)
+        new_alloc = np.argmin(costs)
+        allocations[i] = new_alloc
+        if verbose:
+            desc = "{:.1f} --> {:.1f} --> {:.1f}".format(
+                old_cost,
+                costs[old_alloc],
+                costs[new_alloc],
+            )
+            pbar.set_description(desc)
+    return allocations
+
+
+def eval_swap_values(allocations, customers, facilities, customer, new_facility):
+    alloc = allocations.copy()
+    alloc[customer] = new_facility
+    return total_cost(alloc, customers, facilities)
+
+
+def uncap_mip(customers, facilities, max_time=60):
+    n_fac = len(facilities)
+    n_cust = len(customers)
+    solver = Solver.CreateSolver("FacilityLocation", "SCIP")
+
+    x = []
+    y = []
+    for f in range(n_fac):
+        y.append([solver.BoolVar(f"y_{f}_{c}") for c in range(n_cust)])
+        x.append(solver.BoolVar(f"x_{f}"))
+
+    caps = [f.capacity for f in facilities]
+    setup = [f.setup_cost for f in facilities]
+    dist = distance_matrix(customers, facilities).astype(int)
+    demands = [c.demand for c in customers]
+
+    for f in range(n_fac):
+        for c in range(n_cust):
+            solver.Add(y[f][c] <= x[f])
+    for c in range(n_cust):
+        solver.Add(sum([y[f][c] for f in range(n_fac)]) == 1)
+
+    obj = 0
+    for f in range(n_fac):
+        #     obj += setup[f]*x[f]
+        obj += sum([dist[f][c] * y[f][c] for c in range(n_cust)])
+
+    solver.Minimize(obj)
+
+    STATUS = {
+        Solver.FEASIBLE: "FEASIBLE",
+        Solver.UNBOUNDED: "UNBOUNDED",
+        Solver.BASIC: "BASIC",
+        Solver.INFEASIBLE: "INFEASIBLE",
+        Solver.NOT_SOLVED: "NOT_SOLVED",
+        Solver.OPTIMAL: "OPTIMAL",
+    }
+    solver.SetTimeLimit(max_time * 1000)
+
+    status = solver.Solve()
+    STATUS[status]
+    a = []
+    for f in range(n_fac):
+        a.append([y[f][c].solution_value() for c in range(n_cust)])
+
+    sol = np.array(a).argmax(axis=0)
+    return sol, STATUS[status]
+
+
+def uncap_mip_iter(customers, facilities, triple=True, max_time=60):
+    min_fac = min_facilities(customers, facilities)
+
+    # Round 1
+    sol, status = uncap_mip(customers, facilities, max_time)
+    print(f"Initial Status: {status}")
+
+    # Round 2
+    if triple:
+        cntr = list(Counter(sol).items())
+        fid = sorted(cntr, key=itemgetter(1), reverse=True)[: min_fac * 2]
+        fid = sorted([o[0] for o in fid])
+        fac_sub = [f for i, f in enumerate(facilities) if i in fid]
+        sol, status = uncap_mip(customers, fac_sub, max_time)
+        sol = [fid[f] for f in sol]
+        print(f"Intermediate Status: {status}")
+
+    # Round 3
+    cntr = list(Counter(sol).items())
+    fid = sorted(cntr, key=itemgetter(1), reverse=True)[:min_fac]
+    fid = sorted([o[0] for o in fid])
+    fac_sub = [f for i, f in enumerate(facilities) if i in fid]
+    sol, status = uncap_mip(customers, fac_sub, max_time)
+    sol = [fid[f] for f in sol]
+    print(f"Final Status: {status}")
+
+    return sol
+
+
+def cap_mip(customers, facilities, max_time=60):
+    n_fac = len(facilities)
+    n_cust = len(customers)
+    solver = Solver.CreateSolver("FacilityLocation", "SCIP")
+
+    x = []
+    y = []
+    for f in range(n_fac):
+        y.append([solver.BoolVar(f"y_{f}_{c}") for c in range(n_cust)])
+        x.append(solver.BoolVar(f"x_{f}"))
+
+    caps = [f.capacity for f in facilities]
+    setup = [f.setup_cost for f in facilities]
+    dist = distance_matrix(customers, facilities).astype(int)
+    demands = [c.demand for c in customers]
+
+    for f in range(n_fac):
+        for c in range(n_cust):
+            solver.Add(y[f][c] <= x[f])
+    for c in range(n_cust):
+        solver.Add(sum([y[f][c] for f in range(n_fac)]) == 1)
+    for f in range(n_fac):
+        solver.Add(sum([y[f][c] * demands[c] for c in range(n_cust)]) <= caps[f])
+
+    obj = 0
+    for f in range(n_fac):
+        #     obj += setup[f]*x[f]
+        obj += sum([dist[f][c] * y[f][c] for c in range(n_cust)])
+
+    solver.Minimize(obj)
+
+    STATUS = {
+        Solver.FEASIBLE: "FEASIBLE",
+        Solver.UNBOUNDED: "UNBOUNDED",
+        Solver.BASIC: "BASIC",
+        Solver.INFEASIBLE: "INFEASIBLE",
+        Solver.NOT_SOLVED: "NOT_SOLVED",
+        Solver.OPTIMAL: "OPTIMAL",
+    }
+    solver.SetTimeLimit(max_time * 1000)
+
+    status = solver.Solve()
+    STATUS[status]
+    a = []
+    for f in range(n_fac):
+        a.append([y[f][c].solution_value() for c in range(n_cust)])
+
+    sol = np.array(a).argmax(axis=0)
+    return sol, STATUS[status]
