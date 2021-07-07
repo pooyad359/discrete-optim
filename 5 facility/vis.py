@@ -42,3 +42,28 @@ def view_solution(solution, customers, facilities, figsize=(8, 8)):
         x = [facilities[f].location.x, customers[c].location.x]
         y = [facilities[f].location.y, customers[c].location.y]
         plt.plot(x, y, "-k", alpha=0.5)
+
+
+def problem_analysis(customers, facilities):
+    print(f"Customers: {len(customers)}")
+    print(f"Facilities: {len(facilities)}")
+    # Capacity
+    caps = np.array([f.capacity for f in facilities])
+    plt.figure()
+    plt.hist(caps, 100)
+    plt.title(f"Capacities: Average = {caps.mean():.1f} StD = {caps.std():.1f}")
+
+    # Setup Cost
+    setup = np.array([f.setup_cost for f in facilities])
+    plt.figure()
+    plt.hist(setup, 100)
+    plt.title(f"Setup Cost: Average = {setup.mean():.1f} StD = {setup.std():.1f}")
+
+    # Demand
+    demand = np.array([c.demand for c in customers])
+    plt.figure()
+    plt.hist(demand, 100)
+    plt.title(f"Demand: Average = {demand.mean():.1f} StD = {demand.std():.1f}")
+
+    # Map
+    view_problem(customers, facilities)
