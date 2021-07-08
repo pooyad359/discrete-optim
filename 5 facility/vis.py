@@ -45,14 +45,14 @@ def view_solution(solution, customers, facilities, figsize=(8, 8)):
 
 
 def problem_analysis(customers, facilities, plot=True):
-    demands = [c.demand for c in customers]
+    demands = np.array([c.demand for c in customers])
     caps = np.array([f.capacity for f in facilities])
     print(f"Customers: {len(customers)}")
     print(f"Facilities: {len(facilities)}")
     print(f"Total Demand: {sum(demands)}")
-    print(f"Minimum = {demands.min()} \t Maximum = {demands.max}")
+    print(f"Minimum = {demands.min()} \t Maximum = {demands.max()}")
     print(f"Total Capacity: {sum(caps)}")
-    print(f"Minimum = {caps.min()} \t Maximum = {caps.max}")
+    print(f"Minimum = {caps.min()} \t Maximum = {caps.max()}")
     print(f"Minimum Facilities Required: {min_facilities(customers,facilities)}")
     if plot:
         # Capacity
