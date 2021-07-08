@@ -1,5 +1,5 @@
 import numpy as np
-from calc import total_cost, total_demand, length, min_facilities, distance_matrix
+from calc import total_cost, total_demand, length, est_facilities, distance_matrix
 from tqdm.auto import tqdm, trange
 from exceptions import *
 from sklearn.neighbors import KDTree
@@ -15,7 +15,7 @@ def double_trial(customers, facilities, solver):
     solution = solver(customers, facilities)
 
     # Choosing top facilities
-    min_fac = min_facilities(customers, facilities)
+    min_fac = est_facilities(customers, facilities)
     sorted_facs = sorted(Counter(solution).items(), key=itemgetter(1), reverse=True)
     top_facs_idx = [f for f, i in sorted_facs[:min_fac]]
     top_facs = [facilities[f] for f in top_facs_idx]
@@ -185,7 +185,7 @@ def clustering(customers, facilities):
     n_fac = len(facilities)
 
     # Find minimum number of clusters
-    min_fac = min_facilities(customers, facilities)
+    min_fac = est_facilities(customers, facilities)
 
     # Find cluster centroids
     kmean = KMeans(min_fac)
@@ -293,7 +293,7 @@ def uncap_mip(customers, facilities, max_time=60):
 
 
 def uncap_mip_iter(customers, facilities, triple=True, max_time=60):
-    min_fac = min_facilities(customers, facilities)
+    min_fac = est_facilities(customers, facilities)
 
     # Round 1
     sol, status = uncap_mip(customers, facilities, max_time)

@@ -52,14 +52,25 @@ def distance_matrix(customers, facilities):
     return dist
 
 
-def min_facilities(customers, facilities):
+def est_facilities(customers, facilities):
     caps = [f.capacity for f in facilities]
     cumsum = np.cumsum(sorted(caps))
     demands = [c.demand for c in customers]
     total_demand = sum(demands)
     for i in range(len(facilities)):
         if cumsum[i] >= total_demand:
-            print(f"Demand = {total_demand}, Capacity = {cumsum[i]}")
+            # print(f"Demand = {total_demand}, Capacity = {cumsum[i]}")
+            return i + 1
+
+
+def min_facilities(customers, facilities):
+    caps = [f.capacity for f in facilities]
+    cumsum = np.cumsum(sorted(caps, reverse=True))
+    demands = [c.demand for c in customers]
+    total_demand = sum(demands)
+    for i in range(len(facilities)):
+        if cumsum[i] >= total_demand:
+            # print(f"Demand = {total_demand}, Capacity = {cumsum[i]}")
             return i + 1
 
 
