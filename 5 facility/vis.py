@@ -44,7 +44,7 @@ def view_solution(solution, customers, facilities, figsize=(8, 8)):
         plt.plot(x, y, "-k", alpha=0.5)
 
 
-def problem_analysis(customers, facilities):
+def problem_analysis(customers, facilities, plot=True):
     demands = [c.demand for c in customers]
     caps = np.array([f.capacity for f in facilities])
     print(f"Customers: {len(customers)}")
@@ -54,22 +54,22 @@ def problem_analysis(customers, facilities):
     print(f"Total Capacity: {sum(caps)}")
     print(f"Minimum = {caps.min()} \t Maximum = {caps.max}")
     print(f"Minimum Facilities Required: {min_facilities(customers,facilities)}")
+    if plot:
+        # Capacity
+        plt.figure()
+        plt.hist(caps, 100)
+        plt.title(f"Capacities: Average = {caps.mean():.1f} StD = {caps.std():.1f}")
 
-    # Capacity
-    plt.figure()
-    plt.hist(caps, 100)
-    plt.title(f"Capacities: Average = {caps.mean():.1f} StD = {caps.std():.1f}")
+        # Setup Cost
+        setup = np.array([f.setup_cost for f in facilities])
+        plt.figure()
+        plt.hist(setup, 100)
+        plt.title(f"Setup Cost: Average = {setup.mean():.1f} StD = {setup.std():.1f}")
 
-    # Setup Cost
-    setup = np.array([f.setup_cost for f in facilities])
-    plt.figure()
-    plt.hist(setup, 100)
-    plt.title(f"Setup Cost: Average = {setup.mean():.1f} StD = {setup.std():.1f}")
+        # Demand
+        plt.figure()
+        plt.hist(demands, 100)
+        plt.title(f"Demand: Average = {demands.mean():.1f} StD = {demands.std():.1f}")
 
-    # Demand
-    plt.figure()
-    plt.hist(demands, 100)
-    plt.title(f"Demand: Average = {demands.mean():.1f} StD = {demands.std():.1f}")
-
-    # Map
-    view_problem(customers, facilities)
+        # Map
+        view_problem(customers, facilities)
