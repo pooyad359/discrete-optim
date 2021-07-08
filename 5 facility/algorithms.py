@@ -10,9 +10,9 @@ from operator import itemgetter
 from ortools.linear_solver.pywraplp import Solver
 
 
-def double_trial(customers, facilities, solver):
+def double_trial(customers, facilities, solver, **kwargs):
     # First attempt
-    solution = solver(customers, facilities)
+    solution = solver(customers, facilities, **kwargs)
 
     # Choosing top facilities
     min_fac = est_facilities(customers, facilities)
@@ -21,7 +21,7 @@ def double_trial(customers, facilities, solver):
     top_facs = [facilities[f] for f in top_facs_idx]
 
     # Second Attempt
-    solution2 = greedy_furthest(customers, top_facs)
+    solution2 = greedy_furthest(customers, top_facs, **kwargs)
 
     # Rearrange the solution
     solution2 = [top_facs_idx[f] for f in solution2]
@@ -54,7 +54,7 @@ def greedy(customers, facilities, eps=1e-3):
     return allocations.astype(int)
 
 
-def greedy_furthest(customers, facilities, ignore_setup=True):
+def greedy_furthest(customers, facilities, ignore_setup=True, p_skip=0):
     dist = distance_matrix(customers, facilities)
     n_cust = len(customers)
     n_fac = len(facilities)
@@ -70,6 +70,8 @@ def greedy_furthest(customers, facilities, ignore_setup=True):
             choice_cost += (1 - opened_fac) * setup_cost
         for f in np.argsort(choice_cost):
             if remaining_cap[f] >= customer.demand:
+                if np.random.rand() < p_skip:
+                    continue
                 opened_fac[f] = 1
                 remaining_cap[f] -= customer.demand
                 solution[c] = f
