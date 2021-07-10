@@ -73,3 +73,10 @@ def problem_analysis(customers, facilities, plot=True):
 
         # Map
         view_problem(customers, facilities)
+
+
+def view_metrics(metrics):
+    plt.figure(figsize=(10, 6))
+    n = len(metrics["min_cost"])
+    plt.fill_between(range(n), metrics["min_cost"], metrics["max_cost"], alpha=0.2)
+    plt.plot(range(n), metrics["mean_cost"])
