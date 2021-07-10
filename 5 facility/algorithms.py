@@ -8,12 +8,13 @@ from joblib import Parallel, delayed
 from collections import Counter
 from operator import itemgetter
 from ortools.linear_solver.pywraplp import Solver
+from collections import defaultdict
 
 
 def double_trial(customers, facilities, solver, **kwargs):
     # First attempt
     solution = solver(customers, facilities, **kwargs)
-
+    cost = total_cost(solution, customers, facilities)
     # Choosing top facilities
     min_fac = est_facilities(customers, facilities)
     sorted_facs = sorted(Counter(solution).items(), key=itemgetter(1), reverse=True)
@@ -25,7 +26,11 @@ def double_trial(customers, facilities, solver, **kwargs):
 
     # Rearrange the solution
     solution2 = [top_facs_idx[f] for f in solution2]
-    return solution2
+    cost2 = total_cost(solution2, customers, facilities)
+    if cost2 < cost:
+        return solution2
+    else:
+        return solution
 
 
 def greedy(customers, facilities, eps=1e-3):
@@ -54,7 +59,13 @@ def greedy(customers, facilities, eps=1e-3):
     return allocations.astype(int)
 
 
-def greedy_furthest(customers, facilities, ignore_setup=True, p_skip=0):
+def greedy_furthest(
+    customers,
+    facilities,
+    ignore_setup=True,
+    p_skip=0,
+    pbar=True,
+):
     dist = distance_matrix(customers, facilities)
     n_cust = len(customers)
     n_fac = len(facilities)
@@ -63,7 +74,11 @@ def greedy_furthest(customers, facilities, ignore_setup=True, p_skip=0):
     remaining_cap = np.array([f.capacity for f in facilities])
     setup_cost = np.array([f.setup_cost for f in facilities])
     dist_ord = dist.mean(axis=0).argsort()
-    for c in tqdm(reversed(dist_ord), total=n_cust):
+    if pbar:
+        iterator = tqdm(reversed(dist_ord), total=n_cust)
+    else:
+        iterator = reversed(dist_ord)
+    for c in iterator:
         customer = customers[c]
         choice_cost = dist[:, c]
         if not ignore_setup:
@@ -372,3 +387,63 @@ def cap_mip(customers, facilities, max_time=60):
 
     sol = np.array(a).argmax(axis=0)
     return sol, STATUS[status]
+
+
+def ant_simulator(customers, facilities, distances, probabilities):
+    n_cust = len(customers)
+    n_fac = len(facilities)
+    solution = -np.ones(n_cust)
+    opened_fac = np.zeros(n_fac)
+    remaining_cap = np.array([f.capacity for f in facilities])
+    setup_cost = np.array([f.setup_cost for f in facilities])
+    dist_ord = distances.mean(axis=0).argsort()
+    for c in reversed(dist_ord):
+        customer = customers[c]
+        choice_prob = probabilities[:, c]
+        choice_prob[remaining_cap < customer.demand] = 0
+        choice_prob /= choice_prob.sum()
+        f = np.random.choice(range(n_fac), p=choice_prob)
+        solution[c] = f
+    return solution.astype(int)
+
+
+def ant_colony(
+    customers,
+    facilities,
+    q=1,
+    offset=0,
+    evaporation=0.1,
+    ants=100,
+    generations=100,
+):
+    n_cust = len(customers)
+    n_fac = len(facilities)
+    dist = distance_matrix(customers, facilities)
+    weights = np.ones_like(dist)
+    best_sol = None
+    best_cost = np.inf
+    metrics = defaultdict(list)
+    for gen in trange(generations):
+        probs = weights / dist
+        updates = np.zeros_like(dist)
+        costs = []
+        for ant in range(ants):
+            solution = ant_simulator(customers, facilities, dist, probs)
+            cost = total_cost(solution, customers, facilities)
+            edges = allocation2matrix(solution, n_fac)
+            updates += edges * q / (cost - offset)
+            costs.append(cost)
+            if cost < best_cost:
+                best_cost = cost
+                best_sol = solution
+
+        weights = weights * (1 - evaporation) + updates
+        metrics["min_cost"].append(np.min(costs))
+        metrics["max_cost"].append(np.max(costs))
+        metrics["mean_cost"].append(np.mean(costs))
+    return best_sol, metrics
+
+
+def allocation2matrix(allocations, n_facilities):
+    matrix = np.eye(n_facilities)
+    return matrix[np.array(allocations)].T

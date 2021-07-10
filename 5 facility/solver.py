@@ -7,7 +7,7 @@ from os.path import join
 import os
 from calc import length, total_cost
 from algorithms import cap_mip, greedy, ex_local_search, random_allocation
-from algorithms import clustering, greedy_furthest, double_trial
+from algorithms import clustering, greedy_furthest, double_trial, ant_colony
 
 ls = os.listdir
 
@@ -45,11 +45,31 @@ def solve_it(input_data):
     elif mode == 1:
         solution = clustering(customers, facilities)
     elif mode == 2:
-        solution, status = cap_mip(customers, facilities)
+        print("*** Using MIP solver ***")
+        solution, status = cap_mip(customers, facilities, 8 * 3600)
         print(f'MIP Solver finished with status "{status}"')
     elif mode == 3:
         print("Double trial with greedy")
         solution = double_trial(customers, facilities, greedy_furthest)
+    elif mode == 4:
+        print("*** Using Ant Colony Optimisation ***")
+        solution = double_trial(
+            customers,
+            facilities,
+            greedy_furthest,
+            p_skip=0,
+            pbar=False,
+        )
+        cost = total_cost(solution, customers, facilities)
+        q = cost
+        offset = cost * 0.75
+        solution, _ = ant_colony(
+            customers,
+            facilities,
+            q=q,
+            offset=offset,
+            evaporation=0.1,
+        )
     else:
         solution = greedy(customers, facilities)
         status = "FEASIBLE"
@@ -99,10 +119,12 @@ def parse_input(input_data):
 
 
 import sys
+from datetime import datetime
 
 if __name__ == "__main__":
     import sys
 
+    print(datetime.today())
     if len(sys.argv) > 1:
         file_location = sys.argv[1].strip()
         with open(file_location, "r") as input_data_file:
@@ -112,3 +134,4 @@ if __name__ == "__main__":
         print(
             "This test requires an input file.  Please select one from the data directory. (i.e. python solver.py ./data/fl_16_2)"
         )
+    print(datetime.today())
