@@ -83,7 +83,7 @@ def piecewise_mip(customers, facilities, per_grid=100, max_time=60):
             cgrid = [c for c in customers if is_inside(c.location, (xl, xu), (yl, yu))]
             fgrid = [f for f in facilities if is_inside(f.location, (xl, xu), (yl, yu))]
 
-            solgrid = cap_mip_gr(cgrid, fgrid)
+            solgrid = cap_mip_gr(cgrid, fgrid, max_time)
             try:
                 validate(solgrid, cgrid, fgrid)
             except AssertionError:
