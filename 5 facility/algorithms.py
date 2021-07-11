@@ -9,6 +9,7 @@ from collections import Counter
 from operator import itemgetter
 from ortools.linear_solver.pywraplp import Solver
 from collections import defaultdict
+from random import shuffle
 
 
 def double_trial(customers, facilities, solver, **kwargs):
@@ -119,16 +120,20 @@ def random_allocation(customers, facilities):
     return allocations.astype(int)
 
 
-def ex_local_search(solution, customers, facilities, njobs=1):
+def ex_local_search(solution, customers, facilities, selection=None, njobs=1):
     allocations = solution.copy()
     n_cutomers = len(customers)
     n_facilities = len(facilities)
+    if selection is None:
+        selection = np.arange(n_cutomers)
+    shuffle(selection)
     old_cost = total_cost(allocations, customers, facilities)
-    pbar = trange(n_cutomers)
+    pbar = trange(len(selection))
     for i in pbar:
-        customer = customers[i]
+        ci = selection[i]
+        customer = customers[ci]
         costs = np.zeros(n_facilities)
-        old_alloc = allocations[i]
+        old_alloc = allocations[ci]
 
         parallel = Parallel(n_jobs=njobs)
         delayed_func = delayed(eval_swap_values)
@@ -137,13 +142,13 @@ def ex_local_search(solution, customers, facilities, njobs=1):
                 allocations=allocations,
                 customers=customers,
                 facilities=facilities,
-                customer=i,
+                customer=ci,
                 new_facility=j,
             )
             for j in range(n_facilities)
         )
         new_alloc = np.argmin(costs)
-        allocations[i] = new_alloc
+        allocations[ci] = new_alloc
         desc = "{:.1f} --> {:.1f} --> {:.1f}".format(
             old_cost,
             costs[old_alloc],
