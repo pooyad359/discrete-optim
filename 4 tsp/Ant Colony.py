@@ -66,7 +66,7 @@ phermones = None
 best_solution, phermones, history = run_ant_colony(
     points,
     phermones=phermones,
-    trials=200,
+    trials=2000,
     q=1,
     evaporation=0.05,
     offset=0,
