@@ -21,7 +21,8 @@ from algorithms import (
     ant_colony,
     fix_allocations,
 )
-from gurobi_solver import cap_mip_gr
+from gurobi_solver import cap_mip_gr, piecewise_mip
+from objects import Facility, Customer, Point
 
 ls = os.listdir
 
@@ -42,10 +43,10 @@ def solve_it(input_data):
 
     # Solution
     # Selecting the solver
-    if facility_count * customer_count < 100_000:
-        mode = 5
+    if facility_count > 100:
+        mode = 6
     else:
-        mode = 3
+        mode = 5
 
     # Applying the solver
     status = "FEASIBLE"
@@ -83,13 +84,24 @@ def solve_it(input_data):
     elif mode == 5:
         print("*** Using Gurobi Solver ***")
         solution = cap_mip_gr(customers, facilities, 120)
-        solution = fix_allocations(solution, customers, facilities)
-        cost1 = total_cost(solution, customers, facilities)
+        solution1 = fix_allocations(solution, customers, facilities)
+        cost1 = total_cost(solution1, customers, facilities)
         solution2 = double_trial(customers, facilities, greedy_furthest)
         cost2 = total_cost(solution2, customers, facilities)
-        if cost1 > cost2:
+        if cost1 < cost2:
+            solution = solution1
+        else:
             solution = solution2
-
+    elif mode == 6:
+        print("*** Using Piecewise Gurobi Solver ***")
+        solution1 = piecewise_mip(customers, facilities, per_grid=80)
+        cost1 = total_cost(solution1, customers, facilities)
+        solution2 = double_trial(customers, facilities, greedy_furthest)
+        cost2 = total_cost(solution2, customers, facilities)
+        if cost1 < cost2:
+            solution = solution1
+        else:
+            solution = solution2
     else:
         solution = greedy(customers, facilities)
         status = "FEASIBLE"

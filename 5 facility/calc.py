@@ -11,7 +11,9 @@ def total_cost(allocations, customers, facilities):
     try:
         validate(allocations, customers, facilities)
     except AssertionError:
-        m = 10
+        diag = diagnose(allocations, customers, facilities)
+        overloaded = diag[diag[:, 3] < 0, 0]
+        m = 5 + len(overloaded)
     used_facilities = set(allocations)
     capital = sum([facilities[f].setup_cost for f in used_facilities])
     travelling_cost = 0
