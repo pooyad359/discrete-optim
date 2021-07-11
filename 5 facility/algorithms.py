@@ -1,5 +1,12 @@
 import numpy as np
-from calc import total_cost, total_demand, length, est_facilities, distance_matrix
+from calc import (
+    total_cost,
+    total_demand,
+    length,
+    est_facilities,
+    distance_matrix,
+    diagnose,
+)
 from tqdm.auto import tqdm, trange
 from exceptions import *
 from sklearn.neighbors import KDTree
@@ -457,3 +464,18 @@ def ant_colony(
 def allocation2matrix(allocations, n_facilities):
     matrix = np.eye(n_facilities)
     return matrix[np.array(allocations)].T
+
+
+def fix_allocations(allocations, customers, facilities, max_trials=5, verbose=False):
+    for i in range(max_trials):
+        diag = diagnose(allocations, customers, facilities)
+        unselected = np.where(np.array(allocations) < 0)[0]
+        overloaded = diag[diag[:, 3] < 0, 0]
+        selection = list(unselected)
+        selection += [c for c, f in enumerate(allocations) if f in overloaded]
+        if len(selection) == 0:
+            return allocations
+        if verbose:
+            print(f"Performing local search on following points: {selection}")
+        allocations = ex_local_search(allocations, customers, facilities, selection)
+    return allocations
