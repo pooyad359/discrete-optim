@@ -65,6 +65,7 @@ def greedy_furthest(
     ignore_setup=True,
     p_skip=0,
     pbar=True,
+    order=None,
 ):
     dist = distance_matrix(customers, facilities)
     n_cust = len(customers)
@@ -72,8 +73,11 @@ def greedy_furthest(
     solution = -np.ones(n_cust)
     opened_fac = np.zeros(n_fac)
     remaining_cap = np.array([f.capacity for f in facilities])
+    caps = np.array([f.capacity for f in facilities])
     setup_cost = np.array([f.setup_cost for f in facilities])
     dist_ord = dist.mean(axis=0).argsort()
+    if order is not None:
+        dist_ord = np.array(order)
     if pbar:
         iterator = tqdm(reversed(dist_ord), total=n_cust)
     else:
@@ -82,7 +86,8 @@ def greedy_furthest(
         customer = customers[c]
         choice_cost = dist[:, c]
         if not ignore_setup:
-            choice_cost += (1 - opened_fac) * setup_cost
+            # choice_cost += (1 - opened_fac) * setup_cost
+            choice_cost += setup_cost * customer.demand / caps / 2
         for f in np.argsort(choice_cost):
             if remaining_cap[f] >= customer.demand:
                 if np.random.rand() < p_skip:

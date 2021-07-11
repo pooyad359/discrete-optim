@@ -5,9 +5,10 @@ from collections import namedtuple
 import math
 from os.path import join
 import os
-from calc import length, total_cost
+from calc import length, total_cost, validate
 from algorithms import cap_mip, greedy, ex_local_search, random_allocation
 from algorithms import clustering, greedy_furthest, double_trial, ant_colony
+from gurobi_solver import cap_mip_gr
 
 ls = os.listdir
 
@@ -33,9 +34,9 @@ def solve_it(input_data):
     # Solution
     # Selecting the solver
     if facility_count * customer_count < 50_000:
-        mode = 3
+        mode = 5
     else:
-        mode = 3
+        mode = 5
 
     # Applying the solver
     status = "FEASIBLE"
@@ -70,6 +71,13 @@ def solve_it(input_data):
             offset=offset,
             evaporation=0.1,
         )
+    elif mode == 5:
+        print("*** Using Gurobi Solver ***")
+        solution = cap_mip_gr(customers, facilities, 120)
+        try:
+            validate(solution, customers, facilities)
+        except AssertionError:
+            solution = double_trial(customers, facilities, greedy_furthest)
     else:
         solution = greedy(customers, facilities)
         status = "FEASIBLE"
