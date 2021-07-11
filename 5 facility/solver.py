@@ -1,20 +1,29 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from collections import namedtuple
+
 import math
 from os.path import join
 import os
+from threading import currentThread
 from calc import length, total_cost, validate
-from algorithms import cap_mip, greedy, ex_local_search, random_allocation
-from algorithms import clustering, greedy_furthest, double_trial, ant_colony
+from algorithms import (
+    cap_mip,
+    fix_allocations,
+    greedy,
+    ex_local_search,
+    random_allocation,
+)
+from algorithms import (
+    clustering,
+    greedy_furthest,
+    double_trial,
+    ant_colony,
+    fix_allocations,
+)
 from gurobi_solver import cap_mip_gr
 
 ls = os.listdir
-
-Point = namedtuple("Point", ["x", "y"])
-Facility = namedtuple("Facility", ["index", "setup_cost", "capacity", "location"])
-Customer = namedtuple("Customer", ["index", "demand", "location"])
 
 
 def load_data(file, prefix="data"):
@@ -33,10 +42,10 @@ def solve_it(input_data):
 
     # Solution
     # Selecting the solver
-    if facility_count * customer_count < 50_000:
+    if facility_count * customer_count < 100_000:
         mode = 5
     else:
-        mode = 5
+        mode = 3
 
     # Applying the solver
     status = "FEASIBLE"
@@ -74,10 +83,13 @@ def solve_it(input_data):
     elif mode == 5:
         print("*** Using Gurobi Solver ***")
         solution = cap_mip_gr(customers, facilities, 120)
-        try:
-            validate(solution, customers, facilities)
-        except AssertionError:
-            solution = double_trial(customers, facilities, greedy_furthest)
+        solution = fix_allocations(solution, customers, facilities)
+        cost1 = total_cost(solution, customers, facilities)
+        solution2 = double_trial(customers, facilities, greedy_furthest)
+        cost2 = total_cost(solution2, customers, facilities)
+        if cost1 > cost2:
+            solution = solution2
+
     else:
         solution = greedy(customers, facilities)
         status = "FEASIBLE"
