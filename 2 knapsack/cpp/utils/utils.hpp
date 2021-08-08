@@ -1,3 +1,5 @@
+#ifndef _UTILS
+#define _UTILS
 #include <iostream>
 #include <string>
 #include <fstream>
@@ -17,3 +19,4 @@ std::string vectorToString(std::vector<T>);
 
 template <typename T>
 std::vector<size_t> argsort(const std::vector<T> &v);
+#endif

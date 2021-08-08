@@ -1,5 +1,5 @@
 #include "solver.hpp"
-#include ".\utils\utils.cpp"
+
 int main(int argc, char **argv)
 {
     long n_items, capacity, temp;
@@ -27,13 +27,8 @@ int main(int argc, char **argv)
             weights.push_back(temp);
         }
     }
-    cout << "File Name: " << filename << endl;
-    cout << "Items Count: " << n_items << endl;
-    cout << "Max Capacity: " << capacity << endl;
-    cout << "Items values: " << vectorToString(values) << endl;
-    cout << "Items weights: " << vectorToString(weights) << endl;
-    cout << vectorToString(argsort(values)) << endl;
-    cout << "Items values: " << vectorToString(values) << endl;
+    Knapsack ks(weights, values, capacity);
+    cout << ks.toString() << endl;
     file.close();
     return 0;
 }
