@@ -1,6 +1,7 @@
 *.pdf
 *.pyc
 *.ipynb_checkpoints*
+*.ipynb
 */__pycache__/*
 *.zip
 *.sol
