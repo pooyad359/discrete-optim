@@ -77,3 +77,9 @@ int Knapsack::totalValue(std::vector<bool> solution)
     }
     return totalValue;
 }
+
+// Returns true if the capacity is not exeeded
+bool Knapsack::checkSolution(std::vector<bool> solution)
+{
+    return Knapsack::totalWeight(solution) < Knapsack::capacity;
+}

@@ -36,5 +36,6 @@ int main(int argc, char **argv)
     showVector(solution);
     cout << ks.totalWeight(solution) << endl;
     cout << ks.totalValue(solution) << endl;
+    cout << (ks.checkSolution(solution) ? "Solution is Valid" : "Solution is invalid!") << endl;
     return 0;
 }
