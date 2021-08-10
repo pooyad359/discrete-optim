@@ -27,7 +27,7 @@ std::string vectorToString(std::vector<T> input)
 }
 
 template <typename T>
-std::vector<size_t> argsort(const std::vector<T> &v)
+std::vector<size_t> argsort(const std::vector<T> &v, bool reverse)
 {
     std::vector<size_t> idx(v.size());
     iota(idx.begin(), idx.end(), 0);
@@ -38,5 +38,15 @@ std::vector<size_t> argsort(const std::vector<T> &v)
         {
             return v[i1] < v[i2];
         });
+    if (reverse)
+    {
+        std::reverse(idx.begin(), idx.end());
+    }
     return idx;
+}
+
+template <typename T>
+std::vector<size_t> argsort(const std::vector<T> &v)
+{
+    return argsort(v, true);
 }
