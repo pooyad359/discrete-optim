@@ -83,3 +83,24 @@ bool Knapsack::checkSolution(std::vector<bool> solution)
 {
     return Knapsack::totalWeight(solution) < Knapsack::capacity;
 }
+
+std::vector<bool> Knapsack::greedySolver()
+{
+    int spareWeight = Knapsack::capacity;
+    std::vector<bool> solution(Knapsack::n_items);
+    size_t item;
+    for (int i = 0; i < Knapsack::n_items; i++)
+    {
+        item = Knapsack::indexSortedDensities[i];
+        if (Knapsack::weights[item] > spareWeight)
+        {
+            solution[item] = 0;
+        }
+        else
+        {
+            solution[item] = 1;
+            spareWeight -= Knapsack::weights[item];
+        }
+    }
+    return solution;
+}

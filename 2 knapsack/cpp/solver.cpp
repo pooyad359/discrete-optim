@@ -32,7 +32,7 @@ int main(int argc, char **argv)
     file.close();
     ks.argSortDensities();
     // ks.showItemsByDensity();
-    solution = ks.randomSolution();
+    solution = ks.greedySolver();
     showVector(solution);
     cout << ks.totalWeight(solution) << endl;
     cout << ks.totalValue(solution) << endl;

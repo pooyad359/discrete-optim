@@ -32,6 +32,7 @@ public:
     int totalWeight(std::vector<bool>);
     int totalValue(std::vector<bool>);
     std::vector<bool> randomSolution();
+    std::vector<bool> greedySolver();
 };
 
 #endif
