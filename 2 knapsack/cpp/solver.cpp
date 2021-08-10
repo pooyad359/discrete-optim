@@ -5,9 +5,9 @@ int main(int argc, char **argv)
     long n_items, capacity, temp;
     std::string filename = argv[1];
     std::vector<int> weights, values;
+    std::vector<bool> solution;
     std::string line;
     std::ifstream file;
-
     file.open(filename);
     if (file.is_open())
     {
@@ -30,5 +30,11 @@ int main(int argc, char **argv)
     Knapsack ks(weights, values, capacity);
     cout << ks.toString() << endl;
     file.close();
+    ks.argSortDensities();
+    // ks.showItemsByDensity();
+    solution = ks.randomSolution();
+    showVector(solution);
+    cout << ks.totalWeight(solution) << endl;
+    cout << ks.totalValue(solution) << endl;
     return 0;
 }
