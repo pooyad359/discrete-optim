@@ -33,6 +33,7 @@ int main(int argc, char **argv)
     ks.argSortDensities();
     // ks.showItemsByDensity();
     solution = greedySolver(ks);
+    solution = dynamicProg(ks);
     showVector(solution);
     cout << ks.totalWeight(solution) << endl;
     cout << ks.totalValue(solution) << endl;

@@ -10,6 +10,7 @@
 #include ".\utils\utils.cpp"
 #include "knapsack.cpp"
 #include "solvers/greedy.cpp"
+#include "solvers/dynamic_programming.hpp"
 
 using std::cout;
 using std::endl;
