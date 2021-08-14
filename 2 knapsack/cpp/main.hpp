@@ -9,6 +9,7 @@
 #include <algorithm>
 #include ".\utils\utils.cpp"
 #include "knapsack.cpp"
+#include "solvers/greedy.cpp"
 
 using std::cout;
 using std::endl;
