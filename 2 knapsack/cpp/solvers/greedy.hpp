@@ -1,3 +1,5 @@
+#ifndef _GREEDY
+#define _GREEDY
 #include <vector>
 #include <algorithm>
 #include <iterator>
@@ -13,3 +15,5 @@ using std::cout;
 using std::endl;
 
 std::vector<bool> greedySolver(Knapsack);
+
+#endif
