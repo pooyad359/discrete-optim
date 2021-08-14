@@ -38,5 +38,6 @@ int main(int argc, char **argv)
     cout << ks.totalWeight(solution) << endl;
     cout << ks.totalValue(solution) << endl;
     cout << (ks.checkSolution(solution) ? "Solution is Valid" : "Solution is invalid!") << endl;
+    cout << "Testing" << endl;
     return 0;
 }
