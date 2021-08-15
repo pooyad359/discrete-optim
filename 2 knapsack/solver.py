@@ -3,7 +3,7 @@
 
 from collections import namedtuple
 import numpy as np
-from numba import jit
+from numba import jit, int32
 from tqdm.auto import tqdm
 import uuid
 import os
@@ -47,7 +47,7 @@ def solve_it(input_data, use_cpp=False):
         # print("### Greedy Algo ###")
         # selection, weight, count, spare = greedy_dens(values, weights, cap)
         print("### Filtering ###")
-        selection, weight, count, spare = filtering(values, weights, cap)
+        selection = filtering(values, weights, cap)
         for i in tqdm(range(N_TRIALS)):
             selection, weight, count, spare = local_search(
                 values, weights, cap, selection
@@ -57,7 +57,11 @@ def solve_it(input_data, use_cpp=False):
     #     selection, weight, count,spare = DynP(values, weights, cap)
     else:
         print("### Dynamic Programming ###")
-        selection, weight, count, spare = DynPjit(values, weights, cap)
+        selection = DynPjit(
+            np.array(values, dtype=np.int32),
+            np.array(weights, dtype=np.int32),
+            cap,
+        )
     value = np.sum(selection * values)
 
     # prepare the solution in the specified output format
@@ -182,23 +186,18 @@ def DynP(values, weights, capacity):
     )
 
 
-@jit(
-    parallel=False,
-)
+@jit(int32[:](int32[:], int32[:], int32))
 def DynPjit(values, weights, capacity):
-    weights = np.int32(weights)
-    values = np.int32(values)
-    capacity = np.int32(capacity)
-    nitems = np.shape(values)[0]
-    rows = np.int32(capacity) + 1
-    cols = np.int32(nitems + 1)
+    nitems = values.size
+    rows = capacity + 1
+    cols = nitems + 1
     mat = np.zeros((rows, cols))
     for row in np.arange(rows, dtype=np.int32):
         for col in np.arange(1, cols, dtype=np.int32):
 
-            i = np.int32(col - 1)
-            wi = np.int32(weights[i])
-            vi = np.int32(values[i])
+            i = col - 1
+            wi = weights[i]
+            vi = values[i]
             if row < wi:
                 mat[row, col] = mat[row, col - 1]
             else:
@@ -208,20 +207,9 @@ def DynPjit(values, weights, capacity):
     for c in range(nitems, 0, -1):
         if mat[row, c] != mat[row, c - 1]:
             selection[c - 1] = 1
-            row = row - np.int32(weights[c - 1])
+            row = row - weights[c - 1]
 
-    #     return mat[-1, -1], selection
-    final_weight = np.sum(selection * weights)
-    final_value = np.sum(selection * values)
-    # if abs(final_value - mat[-1, -1]) > 1e-3:
-    #     print(f"***Warning: {np.sum(selection * values)} =/= {mat[-1,-1]}")
-    spare = capacity - final_weight
-    return (
-        selection.astype(np.int8),
-        np.dot(selection, weights),
-        np.sum(selection, dtype=np.int32),
-        spare,
-    )
+    return selection
 
 
 if __name__ == "__main__":
