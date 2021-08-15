@@ -7,14 +7,15 @@
 #include <sstream>
 #include <iterator>
 #include <algorithm>
-#include ".\utils\utils.cpp"
+#include <chrono>
+#include "./utils/utils.cpp"
 #include "knapsack.cpp"
 #include "solvers/greedy.cpp"
 #include "solvers/dynamic_programming.hpp"
 
+using namespace std::chrono;
 using std::cout;
 using std::endl;
-
 template <typename T>
 void showVector(std::vector<T>);
 

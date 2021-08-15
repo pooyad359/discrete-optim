@@ -11,6 +11,7 @@ int main(int argc, char **argv)
     std::ifstream fileIn;
     std::ofstream fileOut;
     fileIn.open(filename);
+    cout << "\t" << argv[1] << "\t" << argv[2] << endl;
     if (fileIn.is_open())
     {
         // Read First Line
@@ -30,11 +31,13 @@ int main(int argc, char **argv)
         }
     }
     cout << "Input:" << endl;
+    auto start = high_resolution_clock::now();
     Knapsack ks(weights, values, capacity);
     cout << ks.toString() << endl;
     fileIn.close();
-    ks.argSortDensities();
+    // ks.argSortDensities();
     solution = dynamicProg(ks);
+    auto stop = high_resolution_clock::now();
     cout << "Total Weight: " << ks.totalWeight(solution) << endl;
     cout << "Total Value: " << ks.totalValue(solution) << endl;
     cout << "Solution:" << endl;
@@ -46,5 +49,8 @@ int main(int argc, char **argv)
     fileOut << ks.totalValue(solution) << " " << 1 << endl;
     fileOut << vectorToString(solution);
     fileOut.close();
+    auto duration = duration_cast<microseconds>(stop - start);
+    cout << "C++ Elapsed Time: " << duration.count() / 1000.0 << endl;
+
     return 0;
 }
