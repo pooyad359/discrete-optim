@@ -30,7 +30,7 @@ template <typename T>
 std::vector<size_t> argsort(const std::vector<T> &v, bool reverse)
 {
     std::vector<size_t> idx(v.size());
-    iota(idx.begin(), idx.end(), 0);
+    std::iota(idx.begin(), idx.end(), 0);
     std::stable_sort(
         idx.begin(),
         idx.end(),

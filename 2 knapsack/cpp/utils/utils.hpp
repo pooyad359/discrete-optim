@@ -7,6 +7,7 @@
 #include <sstream>
 #include <iterator>
 #include <algorithm>
+#include <numeric>
 
 using std::cout;
 using std::endl;
