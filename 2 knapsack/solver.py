@@ -8,6 +8,7 @@ from tqdm.auto import tqdm
 import uuid
 import os
 import time
+import sys
 
 Item = namedtuple("Item", ["index", "value", "weight"])
 N_TRIALS = 100
@@ -19,8 +20,12 @@ def cpp_solver(input_data):
     output_name = "." + uuid.uuid4().hex
     with open(input_name, "w") as fp:
         fp.write(input_data)
-    output = os.popen(f".\cpp\main.exe {input_name} {output_name}")
-    print(output.read())
+
+    if sys.platform == "linux":
+        output = os.popen(f"./cpp/main {input_name} {output_name}")
+    else:
+        output = os.popen(f".\cpp\main.exe {input_name} {output_name}")
+    print("OUTPUT: ", output.read())
     with open(output_name, "r") as fp:
         submission = fp.read()
     os.remove(input_name)
