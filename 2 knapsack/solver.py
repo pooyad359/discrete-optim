@@ -5,14 +5,34 @@ from collections import namedtuple
 import numpy as np
 from numba import jit
 from tqdm.auto import tqdm
+import uuid
+import os
+import time
 
 Item = namedtuple("Item", ["index", "value", "weight"])
 N_TRIALS = 100
 
 
-def solve_it(input_data):
-    # Modify this code to run your optimization algorithm
+def cpp_solver(input_data):
+    print("*** USING C++ SOLVER ***")
+    input_name = "." + uuid.uuid4().hex
+    output_name = "." + uuid.uuid4().hex
+    with open(input_name, "w") as fp:
+        fp.write(input_data)
+    output = os.popen(f".\cpp\main.exe {input_name} {output_name}")
+    print(output.read())
+    with open(output_name, "r") as fp:
+        submission = fp.read()
+    os.remove(input_name)
+    os.remove(output_name)
+    return submission
 
+
+def solve_it(input_data, use_cpp=False):
+    if use_cpp:
+        return cpp_solver(input_data)
+
+    print("*** USING PYTHON SOLVER ***")
     # parse the input
     lines = input_data.split("\n")
     data = [line.split() for line in lines if len(line) > 0]
@@ -207,12 +227,16 @@ def DynPjit(values, weights, capacity):
 if __name__ == "__main__":
     import sys
 
+    start = time.perf_counter_ns()
     if len(sys.argv) > 1:
         file_location = sys.argv[1].strip()
+        use_cpp = len(sys.argv) > 2
         with open(file_location, "r") as input_data_file:
             input_data = input_data_file.read()
-        print(solve_it(input_data))
+        print(solve_it(input_data, use_cpp))
     else:
         print(
             "This test requires an input file.  Please select one from the data directory. (i.e. python solver.py ./data/ks_4_0)"
         )
+    end = time.perf_counter_ns()
+    print(f"Elapsed Time (ms): {(end - start) * 1e-6:.2f}")
